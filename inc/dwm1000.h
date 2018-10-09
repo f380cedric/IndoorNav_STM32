@@ -7,16 +7,16 @@
 /* ------------------------------------- */
 /* REGISTERS LENGTHS                     */
 /* ------------------------------------- */
-#define DEV_ID_LEN							4
-#define TX_FCTRL_LEN						5
-#define SYS_MASK_LEN						4
-#define LEN_SYS_CTRL						4
-#define SYS_CFG_LEN							4
-#define CHAN_CTRL_LEN						4
-#define PMSC_CTRL0_LEN					4
+#define DEV_ID_LEN		4
+#define TX_FCTRL_LEN		5
+#define SYS_MASK_LEN		4
+#define LEN_SYS_CTRL		4
+#define SYS_CFG_LEN		4
+#define CHAN_CTRL_LEN		4
+#define PMSC_CTRL0_LEN		4
 
 /* ------------------------------------- */
-/* REGISTERS MAP		                     */
+/* REGISTERS MAP                         */
 /* ------------------------------------- */
 #define DEV_ID      0x00
 #define EUI         0x01
@@ -63,30 +63,30 @@
 /* ------------------------------------- */
 /* REGISTERS BIT MAP                     */
 /* ------------------------------------- */
-#define TRXOFF_BIT							6
-#define TXSTRT_BIT							1
-#define TX_OK_BIT								7
-#define RX_FINISHED_BIT					13
-#define RX_NO_ERROR_BIT					14
-#define WAIT4RESP_BIT						7
+#define TRXOFF_BIT		6
+#define TXSTRT_BIT		1
+#define TX_OK_BIT		7
+#define RX_FINISHED_BIT		13
+#define RX_NO_ERROR_BIT		14
+#define WAIT4RESP_BIT		7
 
 /* ------------------------------------- */
 /* DEVICE MODE                           */
 /* ------------------------------------- */
-#define IDLE_MODE								0x00
-#define RX_MODE									0x01
-#define TX_MODE									0x02
+#define IDLE_MODE	0x00
+#define RX_MODE		0x01
+#define TX_MODE		0x02
 
 /* ------------------------------------- */
 /* READ-WRITE DEFINES                    */
 /* ------------------------------------- */
 
-#define NO_SUB									0xFF
-#define WRITE										0x80
-#define WRITE_SUB								0xC0
-#define READ										0x00
-#define READ_SUB								0x40
-#define RW_SUB_EXT							0x80
+#define NO_SUB		0xFFFF
+#define WRITE		0x80
+#define WRITE_SUB	0xC0
+#define READ		0x00
+#define READ_SUB	0x40
+#define RW_SUB_EXT	0x80
 
 /* ------------------------------------- */
 /* UTILITIES DEFINES                     */
@@ -104,8 +104,6 @@ extern uint8_t _sysctrl[LEN_SYS_CTRL];
 extern uint8_t _deviceMode;
 
 extern SPI_HandleTypeDef* _deviceHandle;  // TODO this is dangerous because we could use deviceHandle before it's initialization
-
-
 
 /* -------------------- Functions Definitions ---------------------------- */
 
@@ -144,14 +142,20 @@ void idle(void);
 void DWM_reset(void);
 
 /**
+* @brief soft reset the RX
+*/
+void DWM_Reset_Rx(void);
+
+/**
 * @brief enable the RX state of the decawave
 */
 void DWM_Enable_Rx(void);
 
+
 /**
 * @brief disable the RX state of the decawave
 */
-void DWM_Disable_Rx(void);
+//void DWM_Disable_Rx(void);
 
 /* ------------------------------------- */
 /*  RAW READ-WRITE FUNCTIONS             */

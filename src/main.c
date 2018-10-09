@@ -396,10 +396,10 @@ int main(void)
 
 			case STATE_WAIT_RECEIVE :
 				if (RxError){
+					DWM_Reset_Rx();
 					state = STATE_INIT;
 					RxError = 0;
-				}
-				if (RxOk){
+				} else if (RxOk){
 					// Read Rx buffer
 					DWM_ReceiveData(RxData);
 					// Check RxFrame
@@ -679,7 +679,7 @@ static void MX_GPIO_Init(void)
 }
 
 /* USER CODE BEGIN 4 */
-
+#ifdef MASTER_BOARD
 void trilateration2D(int ri[3], float prevPos[2]){
     int p[3][2];
     p[0][0] = BEACONPOS1X;
@@ -767,7 +767,7 @@ void trilateration2D(int ri[3], float prevPos[2]){
 		prevPos[0] = c[0] + q[0];
 		prevPos[1] = c[1] + q[1];
 }
-
+#endif
 void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin){
 	if (GPIO_Pin == B1_Pin) {state = END_STATE;}
 	if (GPIO_Pin != SPI_IRQ_Pin){return;}
@@ -788,22 +788,23 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin){
 		setBit(ack, 4, TX_OK_BIT, 1);
 	}
 	// check if RX finished
-	if (StatusRegister & RX_FINISHED_MASK){
-		setBit(ack, 4, RX_FINISHED_BIT, 1);
-		// check in no error in RX
-		if (StatusRegister & RX_NO_ERROR_MASK){
-			RxOk = 1;
-			setBit(ack, 4, RX_NO_ERROR_BIT, 1);
-		}
-	}
-	if ((StatusRegister & RX_ERROR_MASK) | (StatusRegister & RX_TIMEOUT_MASK)){
+	if (StatusRegister & RX_ERROR_MASK) {
+		ack[0] |= RX_ERROR_MASK;
+		ack[1] |= RX_ERROR_MASK >> 8;
+		ack[2] |= RX_ERROR_MASK >> 16;
+		ack[3] |= RX_ERROR_MASK >> 24;
 		RxError = 1;
-		setBit(ack,4,12,1);
-		setBit(ack,4,17,1);
+	} else if ((StatusRegister & RX_FINISHED_MASK) == RX_FINISHED_MASK) {
+		ack[0] |= RX_FINISHED_MASK;
+		ack[1] |= RX_FINISHED_MASK >> 8;
+		ack[2] |= RX_FINISHED_MASK >> 16;
+		ack[3] |= RX_FINISHED_MASK >> 24;
+		RxOk = 1;
 	}
 	// clear IRQ flags on DW
 	DWM_WriteSPI_ext(SYS_STATUS ,NO_SUB, ack, 4);
 }
+
 void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart){
 	if (huart->Instance == USART1){  //current UART
 		if (uartRx_data[0]==13){ //if received data is ascii 13 (enter)

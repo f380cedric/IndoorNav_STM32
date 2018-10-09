@@ -1,4 +1,3 @@
-
 #include <inttypes.h>
 #include <string.h>
 #include "main.h"
@@ -21,11 +20,11 @@ SPI_HandleTypeDef* _deviceHandle;
 /* ------------------------------------- */
 void DWM_Init(void){
 
-  DWM_reset();
+	DWM_reset();
 
 	uint8_t SPIRxBuffer8[4];
 
-  // Check DW ID
+	// Check DW ID
 	DWM_ReadSPI_ext(DEV_ID, NO_SUB, SPIRxBuffer8, DEV_ID_LEN);
 	uint32_t deviceID =(SPIRxBuffer8[3] << 24) | (SPIRxBuffer8[2] << 16) | (SPIRxBuffer8[1] << 8) | SPIRxBuffer8[0];
 
@@ -38,70 +37,98 @@ void DWM_Init(void){
 			HAL_Delay(100);
 		}
 	}
- // RXAUTR: Receiver auto-re-enable
-	uint8_t sysCfg[SYS_CFG_LEN];
-  DWM_ReadSPI_ext(SYS_CFG, NO_SUB, sysCfg, SYS_CFG_LEN);
-	sysCfg[3] = 0x20;
-	sysCfg[1] = 0x12;
-	sysCfg[0] = 0x00;
-	setBit(sysCfg,SYS_CFG_LEN,22,1);//setting 110kbps
-  DWM_WriteSPI_ext(SYS_CFG, NO_SUB, sysCfg, SYS_CFG_LEN);
+	// Set RX 110kbps
+	uint8_t sysCfg[2];
+	sysCfg[1] = 0x00;
+	sysCfg[0] = 1<<6;
+	DWM_WriteSPI_ext(SYS_CFG, 0x02, sysCfg, 2);
 
-	// CHAN_CTRL
-	uint8_t chanCtrl[CHAN_CTRL_LEN];
-	DWM_ReadSPI_ext(CHAN_CTRL, NO_SUB, chanCtrl, CHAN_CTRL_LEN);
-	chanCtrl[0] = 0x55;
-	chanCtrl[2] &= 0xC5;
-	chanCtrl[2] |= 0x04;
-  DWM_WriteSPI_ext(CHAN_CTRL, NO_SUB, chanCtrl, CHAN_CTRL_LEN);
+	// CHAN_CTRL: set RXPRF 01
+	uint8_t chanCtrl[1];
+	chanCtrl[0] = 1<<2;
+	DWM_WriteSPI_ext(CHAN_CTRL, 0x02, chanCtrl, 1);
 
-	// F_CTRL
-	uint8_t fctrl[TX_FCTRL_LEN];
-	DWM_ReadSPI_ext(TX_FCTRL, NO_SUB, fctrl, TX_FCTRL_LEN);
-	fctrl[0] = 0x0C;
-	fctrl[1] = 0x80;
-	fctrl[2] = 0x15;
-	fctrl[3] = 0x00;
-	fctrl[4] = 0x00;
-	DWM_WriteSPI_ext(TX_FCTRL, NO_SUB, fctrl, TX_FCTRL_LEN);
+/****************************************************************************************
+ * *************************************************************************************/
+
+	// DEFAULT CONFIGURATION THAT SOULD BE MODIFIED (SECTION 2.5.5 OF USER MANUAL)
+	// AGC_TUNE1
+	uint8_t agc_tune1[2] = {0x70, 0X88};
+	DWM_WriteSPI_ext(AGC_CTRL, 0x04, agc_tune1, 2);
+
+	//AGC_TUNE2
+	uint8_t agc_tune2[4] = {0x07, 0xA9, 0x02, 0x25};
+	DWM_WriteSPI_ext(AGC_CTRL, 0x0C, agc_tune2, 4);
+
+	// DRX_TUNE2
+        uint8_t drx_tune2[4] = {0x2d, 0x00, 0x1a, 0x31};
+        DWM_WriteSPI_ext(DRX_CONF, 0x08, drx_tune2, 4);
+
+        // LDE_CFG1: NTM
+        uint8_t lde_cfg1[1] = {0x6d};
+        DWM_WriteSPI_ext(LDE_CTRL, 0x0806, lde_cfg1, 1);
+
+        // LDE_CFG2
+        uint8_t lde_cfg2[2] = {0x07, 0x16};
+        DWM_WriteSPI_ext(LDE_CTRL, 0x1806, lde_cfg2, 2);
+
+        // TX_POWER
+        uint8_t tx_power[4] = {0x48, 0x28, 0x08, 0x0e};
+        DWM_WriteSPI_ext(TX_POWER,NO_SUB, tx_power, 4);
+
+        // RF_TXCTRL
+        uint8_t rf_txctrl[3] = {0xe0, 0x3f, 0x1e};
+        DWM_WriteSPI_ext(RF_CONF, 0x0c, rf_txctrl, 3);
+
+        // TC_PGDELAY
+        uint8_t tc_pgdelay[1] = {0xc0};
+        DWM_WriteSPI_ext(TX_CAL, 0x0b, tc_pgdelay, 1);
+
+        // FS_PLLTUNE
+        uint8_t fs_plltune[1] = {0xbe};
+        DWM_WriteSPI_ext(FS_CTRL, 0x0b, fs_plltune, 1);
+
+/****************************************************************************************
+ * *************************************************************************************/
+
+	// TX_FCTRL: TR & TXBR to 110k
+	uint8_t fctrl[1] = {0x80};
+	DWM_WriteSPI_ext(TX_FCTRL, 0x01, fctrl, 1);
 
 	// setup Rx Timeout 5ms
 #ifdef MASTER_BOARD
 	uint8_t timeout[] = {0x88, 0x13};
 	DWM_WriteSPI_ext(RX_FWTO,NO_SUB, timeout, 2);
-	DWM_ReadSPI_ext(SYS_CFG, NO_SUB, sysCfg, SYS_CFG_LEN);
-	setBit(sysCfg, SYS_CFG_LEN, 28,1);
-	DWM_WriteSPI_ext(SYS_CFG, NO_SUB, sysCfg, SYS_CFG_LEN);
+	DWM_ReadSPI_ext(SYS_CFG, 0x03, sysCfg, 1);
+	sysCfg[0] |= 1<<4;
+	DWM_WriteSPI_ext(SYS_CFG, 0x03, sysCfg, 1);
 #endif
 
-  // setup of the irq
+	// setup of the irq
 	uint8_t sysMask[SYS_MASK_LEN];
 	DWM_ReadSPI_ext(SYS_MASK, NO_SUB, sysMask, SYS_MASK_LEN);
-	setBit(sysMask,SYS_MASK_LEN,7,1);//TX OK
-	setBit(sysMask,SYS_MASK_LEN,14,1);//RX OK NO ERROR
-#ifdef MASTER_BOARD
+	setBit(sysMask,SYS_MASK_LEN,7,1);// TX OK
+	setBit(sysMask,SYS_MASK_LEN,10,1);// RX OK
+	setBit(sysMask,SYS_MASK_LEN,13,1);// RX OK
+	setBit(sysMask,SYS_MASK_LEN,14,1);// RX OK
 	setBit(sysMask,SYS_MASK_LEN,12,1);// RX ERROR
-	setBit(sysMask,SYS_MASK_LEN,17,1);// RX Timeout
-#endif
-  DWM_WriteSPI_ext(SYS_MASK, NO_SUB, sysMask, SYS_MASK_LEN);
+	setBit(sysMask,SYS_MASK_LEN,15,1);// RX ERROR
+	setBit(sysMask,SYS_MASK_LEN,16,1);// RX ERROR
+	setBit(sysMask,SYS_MASK_LEN,17,1);// RX TIMEOUT
+	setBit(sysMask,SYS_MASK_LEN,18,1);// RX ERROR
+	setBit(sysMask,SYS_MASK_LEN,21,1);// RX ERROR
+	setBit(sysMask,SYS_MASK_LEN,26,1);// RX ERROR
+	DWM_WriteSPI_ext(SYS_MASK, NO_SUB, sysMask, SYS_MASK_LEN);
 
-  // antenna delay
-	uint16_t delayuint16 = ANTENNA_DELAY;
+	// antenna delay
 	uint8_t delayuint8[2];
-	delayuint8[1] = (delayuint16 & 0xFF00) >>8;
-	delayuint8[0] = (delayuint16 & 0xFF);
+	delayuint8[1] = (ANTENNA_DELAY & 0xFF00) >>8;
+	delayuint8[0] = (ANTENNA_DELAY & 0xFF);
 	DWM_WriteSPI_ext(TX_ANTD, NO_SUB, delayuint8, 2);
-	//DWM_WriteSPI_ext(LDE_CTRL, 0x1804, delayuint8,2);
 
-	// ERIC - Check SYS_STATUS
-		// clear IRQ flags on DW
-	uint8_t ack[4];
-	memset(ack, 0, 4);
-	setBit(ack, 4, 7, 1);
-	setBit(ack, 4, 14, 1);
-	DWM_WriteSPI_ext(SYS_STATUS, NO_SUB, ack, 4);
 	HAL_GPIO_WritePin(GPIOC, LD6_Pin, GPIO_PIN_SET);
 	HAL_Delay(100);
+	_deviceMode = IDLE_MODE;
 }
 
 void idle() {
@@ -116,58 +143,56 @@ void idle() {
 }
 
 void DWM_reset(void){
-	uint8_t pmscCtrl0[PMSC_CTRL0_LEN];
-	// Getting PMSC_CTRL0 register
-	DWM_ReadSPI_ext(PMSC, PMSC_CTRL0, pmscCtrl0, PMSC_CTRL0_LEN);
+	uint8_t pmscCtrl0[2];
 
 	// Set SYSCLKS bits to 01
-	pmscCtrl0[0] &= 0xFC;
-	pmscCtrl0[0] |= 0x01;
-	DWM_WriteSPI_ext(PMSC, PMSC_CTRL0, pmscCtrl0, PMSC_CTRL0_LEN);
+	pmscCtrl0[0] = 0x01;
+	DWM_WriteSPI_ext(PMSC, PMSC_CTRL0, pmscCtrl0, 1);
 	HAL_Delay(1);
 
 	// Clear SOFTRESET bits
-	pmscCtrl0[3] &= 0x0F;
-	DWM_WriteSPI_ext(PMSC, PMSC_CTRL0, pmscCtrl0, PMSC_CTRL0_LEN);
+	pmscCtrl0[0] = 0x00;
+	DWM_WriteSPI_ext(PMSC, 0x03, pmscCtrl0, 1),
 	HAL_Delay(1);
 
 	// Set SOFTRESET bits
-	pmscCtrl0[3] |= 0xF0;
-	pmscCtrl0[0] &= 0xFC;
-	DWM_WriteSPI_ext(PMSC, PMSC_CTRL0, pmscCtrl0, PMSC_CTRL0_LEN);
+	pmscCtrl0[0] = 0xF0;
+	DWM_WriteSPI_ext(PMSC, 0x03, pmscCtrl0, 1);
 	HAL_Delay(5);
 
         // Load the LDE algorithm microcode into LDE RAM or disable LDE execution (clear LDERUNE)
-	uint8_t TxUint8[4];
 
-	TxUint8[0] = 0xF6;
-	TxUint8[1] = 0x00;
-	TxUint8[2] = 0x01;
-	TxUint8[3] = 0x03;
-	HAL_GPIO_WritePin(SPI1_CS_GPIO_Port, SPI1_CS_Pin, GPIO_PIN_RESET);
-	HAL_SPI_Transmit(_deviceHandle, TxUint8, 4, HAL_MAX_DELAY);
-	HAL_GPIO_WritePin(SPI1_CS_GPIO_Port, SPI1_CS_Pin, GPIO_PIN_SET);
+	pmscCtrl0[0] = 0x01;
+	pmscCtrl0[1] = 0x03;
 
-	TxUint8[0] = 0xED;
-	TxUint8[1] = 0x06;
-	TxUint8[2] = 0x00;
-	TxUint8[3] = 0x80;
-	HAL_GPIO_WritePin(SPI1_CS_GPIO_Port, SPI1_CS_Pin, GPIO_PIN_RESET);
-	HAL_SPI_Transmit(_deviceHandle, TxUint8, 4, HAL_MAX_DELAY);
-	HAL_GPIO_WritePin(SPI1_CS_GPIO_Port, SPI1_CS_Pin, GPIO_PIN_SET);
+	DWM_WriteSPI_ext(PMSC, PMSC_CTRL0, pmscCtrl0, 2);
 
 	HAL_Delay(1);
 
-	TxUint8[0] = 0xF6;
-	TxUint8[1] = 0x00;
-	TxUint8[2] = 0x00;
-	TxUint8[3] = 0x02;
-	HAL_GPIO_WritePin(SPI1_CS_GPIO_Port, SPI1_CS_Pin, GPIO_PIN_RESET);
-	HAL_SPI_Transmit(_deviceHandle, TxUint8, 4, HAL_MAX_DELAY);
-	HAL_GPIO_WritePin(SPI1_CS_GPIO_Port, SPI1_CS_Pin, GPIO_PIN_SET);
+	uint8_t opt_ctrl[2];
+	opt_ctrl[0] = 0x00;
+	opt_ctrl[1] = 0x80;
+
+	DWM_WriteSPI_ext(OTP_IF, 0x06, opt_ctrl, 2);
+
+	HAL_Delay(1);
+
+	pmscCtrl0[0] = 0x00;
+	pmscCtrl0[1] = 0x02;
+
+	DWM_WriteSPI_ext(PMSC, PMSC_CTRL0, pmscCtrl0, 2);
 
 }
 
+void DWM_Reset_Rx(){
+	uint8_t pmscCtrl0[] = {0x0E};
+	DWM_WriteSPI_ext(PMSC, 0x03, pmscCtrl0, 1);
+	HAL_Delay(1);
+
+	pmscCtrl0[0] = 0xF0;
+	DWM_WriteSPI_ext(PMSC, 0x03, pmscCtrl0, 1);
+	_deviceMode = IDLE_MODE;
+}
 void DWM_Enable_Rx(void){
 	idle();
 	uint8_t TxBuf8[4];
@@ -177,13 +202,13 @@ void DWM_Enable_Rx(void){
 	_deviceMode = RX_MODE;
 }
 
-void DWM_Disable_Rx(void){
+/*void DWM_Disable_Rx(void){
 	uint8_t TxBuf8[4];
 	memset(TxBuf8, 0, 4);
 	setBit(TxBuf8,4,8,0);
 	DWM_WriteSPI_ext(SYS_CTRL, NO_SUB, TxBuf8, 4);
 	_deviceMode = IDLE_MODE;
-}
+}*/
 /* ------------------------------------- */
 /*  BITs AND BYTEs  FUNCTIONS            */
 /* ------------------------------------- */
@@ -235,7 +260,7 @@ void DWM_ReadSPI_ext(uint8_t address, uint16_t offset, uint8_t *data, uint16_t l
 		HAL_SPI_Transmit(_deviceHandle, &header[i], 1, HAL_MAX_DELAY);
 	}
 	for (i=0; i < len; i++) {
-		HAL_SPI_TransmitReceive(_deviceHandle, &DUMMY_BYTE[i], &data[i], 1, HAL_MAX_DELAY);
+		HAL_SPI_Receive(_deviceHandle, &data[i], 1, HAL_MAX_DELAY);
 	}
 
 	HAL_GPIO_WritePin(SPI1_CS_GPIO_Port, SPI1_CS_Pin, GPIO_PIN_SET);
@@ -274,7 +299,6 @@ void DWM_WriteSPI_ext(uint8_t address, uint16_t offset, uint8_t *data, uint16_t 
 	__enable_irq();
 }
 
-
 /* ------------------------------------- */
 /*  DWM1000 COMMUNICATIONS	             */
 /* ------------------------------------- */
@@ -304,11 +328,8 @@ void DWM_ReceiveData(uint8_t* buffer){
 	// Get frame length
 	uint8_t flen;
 	DWM_ReadSPI_ext(RX_FINFO, NO_SUB, &flen, 1);
-	flen = flen-2; // FCS 2 Byte long
+	flen -= 2; // FCS 2 Byte long
 
 	//reading data
 	DWM_ReadSPI_ext(RX_BUFFER, NO_SUB, buffer, flen);
-	for (int i =0; i< flen ; i++){
-
-	}
 }
