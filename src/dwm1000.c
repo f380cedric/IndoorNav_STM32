@@ -53,46 +53,46 @@ void DWM_Init(void){
 
 	// DEFAULT CONFIGURATION THAT SOULD BE MODIFIED (SECTION 2.5.5 OF USER MANUAL)
 	// AGC_TUNE1
-	uint8_t agc_tune1[2] = {0x70, 0X88};
+	uint8_t agc_tune1[] = {0x70, 0X88};
 	DWM_WriteSPI_ext(AGC_CTRL, 0x04, agc_tune1, 2);
 
 	//AGC_TUNE2
-	uint8_t agc_tune2[4] = {0x07, 0xA9, 0x02, 0x25};
+	uint8_t agc_tune2[] = {0x07, 0xA9, 0x02, 0x25};
 	DWM_WriteSPI_ext(AGC_CTRL, 0x0C, agc_tune2, 4);
 
 	// DRX_TUNE2
-        uint8_t drx_tune2[4] = {0x2d, 0x00, 0x1a, 0x31};
+        uint8_t drx_tune2[] = {0x2d, 0x00, 0x1a, 0x31};
         DWM_WriteSPI_ext(DRX_CONF, 0x08, drx_tune2, 4);
 
         // LDE_CFG1: NTM
-        uint8_t lde_cfg1[1] = {0x6d};
+        uint8_t lde_cfg1[] = {0x6d};
         DWM_WriteSPI_ext(LDE_CTRL, 0x0806, lde_cfg1, 1);
 
         // LDE_CFG2
-        uint8_t lde_cfg2[2] = {0x07, 0x16};
+        uint8_t lde_cfg2[] = {0x07, 0x16};
         DWM_WriteSPI_ext(LDE_CTRL, 0x1806, lde_cfg2, 2);
 
         // TX_POWER
-        uint8_t tx_power[4] = {0x48, 0x28, 0x08, 0x0e};
+        uint8_t tx_power[] = {0x48, 0x28, 0x08, 0x0e};
         DWM_WriteSPI_ext(TX_POWER,NO_SUB, tx_power, 4);
 
         // RF_TXCTRL
-        uint8_t rf_txctrl[3] = {0xe0, 0x3f, 0x1e};
+        uint8_t rf_txctrl[] = {0xe0, 0x3f, 0x1e};
         DWM_WriteSPI_ext(RF_CONF, 0x0c, rf_txctrl, 3);
 
         // TC_PGDELAY
-        uint8_t tc_pgdelay[1] = {0xc0};
+        uint8_t tc_pgdelay[] = {0xc0};
         DWM_WriteSPI_ext(TX_CAL, 0x0b, tc_pgdelay, 1);
 
         // FS_PLLTUNE
-        uint8_t fs_plltune[1] = {0xbe};
+        uint8_t fs_plltune[] = {0xbe};
         DWM_WriteSPI_ext(FS_CTRL, 0x0b, fs_plltune, 1);
 
 /****************************************************************************************
  * *************************************************************************************/
 
 	// TX_FCTRL: TR & TXBR to 110k
-	uint8_t fctrl[1] = {0x80};
+	uint8_t fctrl[] = {0x80};
 	DWM_WriteSPI_ext(TX_FCTRL, 0x01, fctrl, 1);
 
 	// setup Rx Timeout 5ms
@@ -129,6 +129,19 @@ void DWM_Init(void){
 	HAL_GPIO_WritePin(GPIOC, LD6_Pin, GPIO_PIN_SET);
 	HAL_Delay(100);
 	_deviceMode = IDLE_MODE;
+	DWM_ReadSPI_ext(DEV_ID, NO_SUB, SPIRxBuffer8, DEV_ID_LEN);
+	deviceID =(SPIRxBuffer8[3] << 24) | (SPIRxBuffer8[2] << 16) | (SPIRxBuffer8[1] << 8) | SPIRxBuffer8[0];
+
+	if (deviceID != 0xDECA0130){
+		printf("Wrong DW ID \n");
+		printf("%" PRIx32 "\n", deviceID);
+		// infinite loop
+		while (1){
+			HAL_GPIO_TogglePin(GPIOC, LD3_Pin);
+			HAL_Delay(100);
+		}
+	}
+
 }
 
 void idle() {
@@ -237,8 +250,6 @@ void DWM_ReadSPI_ext(uint8_t address, uint16_t offset, uint8_t *data, uint16_t l
 	memset(header,0,3);
 	uint16_t i = 0;
 	uint8_t headerLen = 1;
-	uint8_t DUMMY_BYTE[len];
-	memset(DUMMY_BYTE, 0, len);
 
 	if (offset == NO_SUB) {
 		header[0] = address | READ;
