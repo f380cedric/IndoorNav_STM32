@@ -6,9 +6,7 @@
 #include "dwm1000.h"
 
 /* ----------------------------------------------------------------------- */
-uint8_t _sysctrl[LEN_SYS_CTRL];
 
-uint8_t _deviceMode;
 
 SPI_HandleTypeDef* _deviceHandle;
 
@@ -128,7 +126,6 @@ void DWM_Init(void){
 
 	HAL_GPIO_WritePin(GPIOC, LD6_Pin, GPIO_PIN_SET);
 	HAL_Delay(100);
-	_deviceMode = IDLE_MODE;
 	DWM_ReadSPI_ext(DEV_ID, NO_SUB, SPIRxBuffer8, DEV_ID_LEN);
 	deviceID =(SPIRxBuffer8[3] << 24) | (SPIRxBuffer8[2] << 16) | (SPIRxBuffer8[1] << 8) | SPIRxBuffer8[0];
 
@@ -145,14 +142,10 @@ void DWM_Init(void){
 }
 
 void idle() {
-	// Set SYS_CTRL to 0
-	memset(_sysctrl, 0, LEN_SYS_CTRL);
-	// Set bit TRXOFF to 1
-	setBit(_sysctrl, LEN_SYS_CTRL, TRXOFF_BIT, 1);
 	// Set the device in IDLE mode
-	_deviceMode = IDLE_MODE;
+	uint8_t sysCtrl[1] = { 1 << TRXOFF_BIT};
 	// Update the DWM1000 module
-	DWM_WriteSPI_ext(SYS_CTRL, NO_SUB, _sysctrl, LEN_SYS_CTRL);
+	DWM_WriteSPI_ext(SYS_CTRL, NO_SUB, sysCtrl, 1);
 }
 
 void DWM_reset(void){
@@ -203,14 +196,12 @@ void DWM_Reset_Rx(){
 
 	pmscCtrl0[0] = 0xF0;
 	DWM_WriteSPI_ext(PMSC, 0x03, pmscCtrl0, 1);
-	_deviceMode = IDLE_MODE;
 }
 void DWM_Enable_Rx(void){
 	uint8_t TxBuf8[4];
 	memset(TxBuf8, 0, 4);
 	setBit(TxBuf8,4,8,1);
 	DWM_WriteSPI_ext(SYS_CTRL, NO_SUB, TxBuf8, 4);
-	_deviceMode = RX_MODE;
 }
 
 /*void DWM_Disable_Rx(void){
@@ -218,7 +209,6 @@ void DWM_Enable_Rx(void){
 	memset(TxBuf8, 0, 4);
 	setBit(TxBuf8,4,8,0);
 	DWM_WriteSPI_ext(SYS_CTRL, NO_SUB, TxBuf8, 4);
-	_deviceMode = IDLE_MODE;
 }*/
 /* ------------------------------------- */
 /*  BITs AND BYTEs  FUNCTIONS            */
@@ -322,14 +312,13 @@ void DWM_SendData(uint8_t* data, uint8_t len){ // data limited to 125 byte long
 
 	// START SENDING
 	// Set bit TXSTRT to 1
-	setBit(_sysctrl, LEN_SYS_CTRL, TXSTRT_BIT, 1);
-	// Remove Force idle mode and wait for response
-	setBit(_sysctrl, LEN_SYS_CTRL, TRXOFF_BIT, 0);
-	setBit(_sysctrl, LEN_SYS_CTRL, WAIT4RESP_BIT, 1);
+
+	uint8_t sysCtrl[1];
+	DWM_ReadSPI_ext(SYS_CTRL, NO_SUB, sysCtrl, 1);
+	sysCtrl[0] |= (1<<TXSTRT_BIT) | (1<<WAIT4RESP_BIT);
 	// Set the device in TX mode
-	_deviceMode = TX_MODE;
 	// Update the DWM1000 module
-	DWM_WriteSPI_ext(SYS_CTRL, NO_SUB, _sysctrl, LEN_SYS_CTRL);
+	DWM_WriteSPI_ext(SYS_CTRL, NO_SUB, sysCtrl, 1);
 }
 
 void DWM_ReceiveData(uint8_t* buffer){

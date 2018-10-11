@@ -774,8 +774,7 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin){
 	if (GPIO_Pin != SPI_IRQ_Pin){return;}
 	uint8_t RxBuffer[4];
 	uint32_t StatusRegister;
-	uint8_t ack[4];
-	memset(ack, 0, 4);
+	uint8_t ack[4] = {0};
 	// Getting status Register
 	DWM_ReadSPI_ext(SYS_STATUS, NO_SUB,  RxBuffer, 4);
 	StatusRegister  = (RxBuffer[3] << 24) | (RxBuffer[2] << 16) | (RxBuffer[1] << 8) | RxBuffer[0];

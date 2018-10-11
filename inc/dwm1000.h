@@ -1,19 +1,12 @@
 #ifndef __DWM1000_H
 #define __DWM1000_H
 
-#include <inttypes.h>
-
 
 /* ------------------------------------- */
 /* REGISTERS LENGTHS                     */
 /* ------------------------------------- */
 #define DEV_ID_LEN		4
-#define TX_FCTRL_LEN		5
 #define SYS_MASK_LEN		4
-#define LEN_SYS_CTRL		4
-#define SYS_CFG_LEN		4
-#define CHAN_CTRL_LEN		4
-#define PMSC_CTRL0_LEN		4
 
 /* ------------------------------------- */
 /* REGISTERS MAP                         */
@@ -71,22 +64,15 @@
 #define WAIT4RESP_BIT		7
 
 /* ------------------------------------- */
-/* DEVICE MODE                           */
-/* ------------------------------------- */
-#define IDLE_MODE	0x00
-#define RX_MODE		0x01
-#define TX_MODE		0x02
-
-/* ------------------------------------- */
 /* READ-WRITE DEFINES                    */
 /* ------------------------------------- */
 
-#define NO_SUB		0xFFFF
-#define WRITE		0x80
-#define WRITE_SUB	0xC0
-#define READ		0x00
-#define READ_SUB	0x40
-#define RW_SUB_EXT	0x80
+#define NO_SUB		0xFFFFU
+#define WRITE		0x80U
+#define WRITE_SUB	0xC0U
+#define READ		0x00U
+#define READ_SUB	0x40U
+#define RW_SUB_EXT	0x80U
 
 /* ------------------------------------- */
 /* UTILITIES DEFINES                     */
@@ -99,10 +85,6 @@
 /* ------------------------------------- */
 /* GLOBAL VARIABLES                      */
 /* ------------------------------------- */
-extern uint8_t _sysctrl[LEN_SYS_CTRL];
-
-extern uint8_t _deviceMode;
-
 extern SPI_HandleTypeDef* _deviceHandle;  // TODO this is dangerous because we could use deviceHandle before it's initialization
 
 /* -------------------- Functions Definitions ---------------------------- */

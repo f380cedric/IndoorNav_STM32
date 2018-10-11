@@ -154,12 +154,10 @@ float beacon3[2] = {1500,2050};
 #define SLAVE_STANDARD_MESSAGE	0x3A
 #endif
 
-#define RX_NO_ERROR_MASK				0x00004000 // RX NO ERROR
-#define RX_TIMEOUT_MASK					0x00020000 // RX TIMEOUT
-#define TX_OK_MASK		0x00000080 // TX OK
-#define RX_FINISHED_MASK	0x00006400 // RX FINISHED
-#define RX_ERROR_MASK		0x04279000 // RX ERROR
-
+#define TX_OK_MASK		0x00000080U // TX OK
+#define RX_FINISHED_MASK	0x00006400U // RX FINISHED
+#define RX_ERROR_MASK		0x04279000U // RX ERROR
+//TODO Remove Master and use enum
 // State Machine Master
 #define STATE_INIT		1
 #define STATE_WAIT_FIRST_SEND	2
@@ -168,7 +166,6 @@ float beacon3[2] = {1500,2050};
 #define STATE_GET_TIMES		5
 #define STATE_COMPUTE_DISTANCE	6
 #define END_STATE		7
-
 // State Machine Slave
 #define STATE_INIT		1
 #define STATE_WAIT_RECEIVE	2
@@ -177,7 +174,6 @@ float beacon3[2] = {1500,2050};
 #define STATE_SEND_TIMES	5
 #define STATE_END_CYCLE		6
 #define STATE_SEND_RESPONSE	7
-
 
 /* USER CODE END Private defines */
 
