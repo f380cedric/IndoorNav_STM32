@@ -371,8 +371,10 @@ int main(void)
 #ifdef SLAVE_BOARD
 		switch (state){
 			case STATE_INIT :
+				RxError = 0;
+				TxOk = 0;
+				RxOk = 0;
 				DWM_Enable_Rx();
-				HAL_Delay(1);
 				state = STATE_WAIT_RECEIVE;
 				#ifdef SLAVE1_BOARD
 				HAL_GPIO_WritePin(GPIOC, LD3_Pin, GPIO_PIN_RESET);
@@ -398,7 +400,6 @@ int main(void)
 				if (RxError){
 					DWM_Reset_Rx();
 					state = STATE_INIT;
-					RxError = 0;
 				} else if (RxOk){
 					// Read Rx buffer
 					DWM_ReceiveData(RxData);
@@ -406,10 +407,11 @@ int main(void)
 					if (RxData[0] == MASTER_FIRST_MESSAGE){
 						state = STATE_MESSAGE_1;
 						HAL_GPIO_WritePin(GPIOC, LD5_Pin, GPIO_PIN_SET);
+						HAL_GPIO_WritePin(GPIOC, LD3_Pin, GPIO_PIN_RESET);
 					}
 					else if (RxData[0] == MASTER_SECOND_MESSAGE){
 						state = STATE_MESSAGE_2;
-						HAL_GPIO_WritePin(GPIOC, LD4_Pin, GPIO_PIN_SET);
+						HAL_GPIO_WritePin(GPIOC, LD3_Pin, GPIO_PIN_SET);
 					}
 					else {state = STATE_INIT;}
 					RxOk = 0;
@@ -455,7 +457,6 @@ int main(void)
 
 			case STATE_END_CYCLE :
 				if (TxOk){
-					TxOk = 0;
 					state = STATE_INIT;
 				}
 			break;
@@ -788,18 +789,21 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin){
 		setBit(ack, 4, TX_OK_BIT, 1);
 	}
 	// check if RX finished
+
+	if ((StatusRegister & RX_FINISHED_MASK) == RX_FINISHED_MASK) {
+		ack[0] |= RX_FINISHED_MASK;
+		ack[1] |= RX_FINISHED_MASK >> 8;
+		ack[2] |= RX_FINISHED_MASK >> 16;
+		ack[3] |= RX_FINISHED_MASK >> 24;
+		RxOk = 1;
+	}
 	if (StatusRegister & RX_ERROR_MASK) {
 		ack[0] |= RX_ERROR_MASK;
 		ack[1] |= RX_ERROR_MASK >> 8;
 		ack[2] |= RX_ERROR_MASK >> 16;
 		ack[3] |= RX_ERROR_MASK >> 24;
 		RxError = 1;
-	} else if ((StatusRegister & RX_FINISHED_MASK) == RX_FINISHED_MASK) {
-		ack[0] |= RX_FINISHED_MASK;
-		ack[1] |= RX_FINISHED_MASK >> 8;
-		ack[2] |= RX_FINISHED_MASK >> 16;
-		ack[3] |= RX_FINISHED_MASK >> 24;
-		RxOk = 1;
+		RxOk = 0;
 	}
 	// clear IRQ flags on DW
 	DWM_WriteSPI_ext(SYS_STATUS ,NO_SUB, ack, 4);

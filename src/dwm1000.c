@@ -108,9 +108,9 @@ void DWM_Init(void){
 	uint8_t sysMask[SYS_MASK_LEN];
 	DWM_ReadSPI_ext(SYS_MASK, NO_SUB, sysMask, SYS_MASK_LEN);
 	setBit(sysMask,SYS_MASK_LEN,7,1);// TX OK
-	setBit(sysMask,SYS_MASK_LEN,10,1);// RX OK
+	//setBit(sysMask,SYS_MASK_LEN,10,1);// RX OK
 	setBit(sysMask,SYS_MASK_LEN,13,1);// RX OK
-	setBit(sysMask,SYS_MASK_LEN,14,1);// RX OK
+	//setBit(sysMask,SYS_MASK_LEN,14,1);// RX OK
 	setBit(sysMask,SYS_MASK_LEN,12,1);// RX ERROR
 	setBit(sysMask,SYS_MASK_LEN,15,1);// RX ERROR
 	setBit(sysMask,SYS_MASK_LEN,16,1);// RX ERROR
@@ -198,16 +198,14 @@ void DWM_reset(void){
 }
 
 void DWM_Reset_Rx(){
-	uint8_t pmscCtrl0[] = {0x0E};
+	uint8_t pmscCtrl0[] = {0xE0};
 	DWM_WriteSPI_ext(PMSC, 0x03, pmscCtrl0, 1);
-	HAL_Delay(1);
 
 	pmscCtrl0[0] = 0xF0;
 	DWM_WriteSPI_ext(PMSC, 0x03, pmscCtrl0, 1);
 	_deviceMode = IDLE_MODE;
 }
 void DWM_Enable_Rx(void){
-	idle();
 	uint8_t TxBuf8[4];
 	memset(TxBuf8, 0, 4);
 	setBit(TxBuf8,4,8,1);
@@ -317,7 +315,6 @@ void DWM_SendData(uint8_t* data, uint8_t len){ // data limited to 125 byte long
 
 	uint8_t fctrl = len+2; // FCS is 2-bytes long
 	/* ** ERIC **/
-	idle();
 	/* ** ERIC ** */
 	DWM_WriteSPI_ext(TX_BUFFER, NO_SUB, data, len);
 	// maj frame length

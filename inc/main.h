@@ -101,8 +101,8 @@
 
 /* USER CODE BEGIN Private defines */
 // board switching
-//#define SLAVE1_BOARD
-#define SLAVE2_BOARD
+#define SLAVE1_BOARD
+//#define SLAVE2_BOARD
 //#define SLAVE3_BOARD
 
 //#define MASTER_BOARD
@@ -154,6 +154,8 @@ float beacon3[2] = {1500,2050};
 #define SLAVE_STANDARD_MESSAGE	0x3A
 #endif
 
+#define RX_NO_ERROR_MASK				0x00004000 // RX NO ERROR
+#define RX_TIMEOUT_MASK					0x00020000 // RX TIMEOUT
 #define TX_OK_MASK		0x00000080 // TX OK
 #define RX_FINISHED_MASK	0x00006400 // RX FINISHED
 #define RX_ERROR_MASK		0x04279000 // RX ERROR
