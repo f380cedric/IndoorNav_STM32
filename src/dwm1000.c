@@ -35,16 +35,10 @@ void DWM_Init(void){
 			HAL_Delay(100);
 		}
 	}
-	// Set RX 110kbps
-	uint8_t sysCfg[2];
-	sysCfg[1] = 0x00;
-	sysCfg[0] = 1<<6;
-	DWM_WriteSPI_ext(SYS_CFG, 0x02, sysCfg, 2);
-
-	// CHAN_CTRL: set RXPRF 01
-	uint8_t chanCtrl[1];
-	chanCtrl[0] = 1<<2;
+	// CHAN_CTRL: Configure channel control
+	uint8_t chanCtrl[] = {1<<2}; // Set RXPRF to 01
 	DWM_WriteSPI_ext(CHAN_CTRL, 0x02, chanCtrl, 1);
+
 
 /****************************************************************************************
  * *************************************************************************************/
@@ -89,8 +83,8 @@ void DWM_Init(void){
 /****************************************************************************************
  * *************************************************************************************/
 
-	// TX_FCTRL: TR & TXBR to 110k
-	uint8_t fctrl[] = {0x80};
+	// TX_FCTRL: TR
+	uint8_t fctrl[] = {0xC0};
 	DWM_WriteSPI_ext(TX_FCTRL, 0x01, fctrl, 1);
 
 	// setup Rx Timeout 5ms
@@ -119,11 +113,11 @@ void DWM_Init(void){
 	DWM_WriteSPI_ext(SYS_MASK, NO_SUB, sysMask, SYS_MASK_LEN);
 
 	// antenna delay
-	uint8_t delayuint8[2];
+/*	uint8_t delayuint8[2];
 	delayuint8[1] = (ANTENNA_DELAY & 0xFF00) >>8;
 	delayuint8[0] = (ANTENNA_DELAY & 0xFF);
 	DWM_WriteSPI_ext(TX_ANTD, NO_SUB, delayuint8, 2);
-
+*/
 	HAL_GPIO_WritePin(GPIOC, LD6_Pin, GPIO_PIN_SET);
 	HAL_Delay(100);
 	DWM_ReadSPI_ext(DEV_ID, NO_SUB, SPIRxBuffer8, DEV_ID_LEN);
