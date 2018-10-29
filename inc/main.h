@@ -128,7 +128,8 @@ float beacon3[2] = {1500,2050};
 */
 
 // Antenna calibration
-#define ANTENNA_DELAY 	0x8000 //Offset for error at -50cm  //0x8066 // precis 10cm
+//#define ANTENNA_DELAY 	65610U //Offset for error at -50cm  //0x8066 // precis 10cm
+#define ANTENNA_DELAY		65670U
 #define THEORETICAL_DISTANCE	5.1
 
 #define ADRESS_AND_PAN		0x000000FF

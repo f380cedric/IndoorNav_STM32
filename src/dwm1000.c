@@ -112,12 +112,18 @@ void DWM_Init(void){
 	setBit(sysMask,SYS_MASK_LEN,26,1);// RX ERROR
 	DWM_WriteSPI_ext(SYS_MASK, NO_SUB, sysMask, SYS_MASK_LEN);
 
+	//uint8_t pe[] = {0x25};
+	//uint8_t pac[] = {0x52,0x00, 0x1A, 0x33};
+	//DWM_WriteSPI_ext(TX_FCTRL, 0x02, pe, 0x01);
+        //DWM_WriteSPI_ext(DRX_CONF, 0x08, pac, 0x04);
 	// antenna delay
-/*	uint8_t delayuint8[2];
-	delayuint8[1] = (ANTENNA_DELAY & 0xFF00) >>8;
-	delayuint8[0] = (ANTENNA_DELAY & 0xFF);
+	uint8_t delayuint8[2];
+	uint16_t antennaDelay = ANTENNA_DELAY >> 1;
+	delayuint8[1] = (antennaDelay & 0xFF00) >>8;
+	delayuint8[0] = (antennaDelay & 0xFF);
 	DWM_WriteSPI_ext(TX_ANTD, NO_SUB, delayuint8, 2);
-*/
+	DWM_WriteSPI_ext(LDE_CTRL, 0x1804, delayuint8, 2);
+
 	HAL_GPIO_WritePin(GPIOC, LD6_Pin, GPIO_PIN_SET);
 	HAL_Delay(100);
 	DWM_ReadSPI_ext(DEV_ID, NO_SUB, SPIRxBuffer8, DEV_ID_LEN);
@@ -319,7 +325,7 @@ void DWM_ReceiveData(uint8_t* buffer){
 	// Get frame length
 	uint8_t flen;
 	DWM_ReadSPI_ext(RX_FINFO, NO_SUB, &flen, 1);
-	flen -= 2; // FCS 2 Byte long
+	flen = (flen & ~(1<<7)) - 2; // FCS 2 Byte long
 
 	//reading data
 	DWM_ReadSPI_ext(RX_BUFFER, NO_SUB, buffer, flen);
