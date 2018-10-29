@@ -74,6 +74,16 @@
 #define READ_SUB	0x40U
 #define RW_SUB_EXT	0x80U
 
+
+enum CHANNEL { _1 = 1U, _2 = 2U, _3 = 3U, _4 = 4U, _5 = 5U, _7 = 7U };
+
+enum PRF { _16MHZ = 0b01U, _64MHZ = 0b10U };
+
+enum BITRATE { _110KBPS = 0b00U, _850KBPS = 0b01U, _6800KBPS = 0b10U };
+
+enum PE { _64 = 0b0001U, _128 = 0b0101U, _256 = 0b1001U, _512 = 0b1101U, _1024 = 0b0010U, _1536 = 0b0110U, _2048 = 0b1010U, _4096 = 0b0011U };
+
+
 /* ------------------------------------- */
 /* UTILITIES DEFINES                     */
 /* ------------------------------------- */
@@ -103,6 +113,23 @@ extern SPI_HandleTypeDef* _deviceHandle;  // TODO this is dangerous because we c
 void setBit(uint8_t *data, uint16_t len, uint8_t bit, uint8_t val);
 
 
+/**
+* @brief Convert uint32_t to uint8_t[4] in little-endian
+* @param dataInt uint32_t to convert
+* @param data[4] array to store result
+*/
+void int2Bytes(const uint32_t dataInt, uint8_t data[4]);
+
+
+/**
+* @brief Convert uint16_t to uint8_t[2] in little-endian
+* @param dataInt uint16_t to convert
+* @param data[2] array to store result
+*/
+void short2Bytes(const uint16_t dataShort, uint8_t data[2]);
+
+
+
 
 /* ------------------------------------- */
 /* STATE MANAGEMENT FUNCTION             */
@@ -121,7 +148,7 @@ void idle(void);
 /**
 * @brief soft reset the DW and load the LDE (manual pp23-24)
 */
-void DWM_reset(void);
+//void DWM_Reset(void);
 
 /**
 * @brief soft reset the RX
