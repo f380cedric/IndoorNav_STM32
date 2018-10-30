@@ -423,7 +423,7 @@ int main(void)
 				DWM_ReadSPI_ext(RX_TIME,NO_SUB, t2_8,5);
 				//HAL_Delay(1);
 				TxData[0] = SLAVE_STANDARD_MESSAGE;
-				DWM_SendData(TxData, 1);
+				DWM_SendData(TxData, 1, 1);
 				state = STATE_SEND_RESPONSE;
 			break;
 
@@ -450,7 +450,7 @@ int main(void)
 					TxData[i+10] = t6_8[i];
 				}
 				//HAL_Delay(1);
-				DWM_SendData(TxData, 15);
+				DWM_SendData(TxData, 15, 0);
 
 				state = STATE_END_CYCLE;
 			break;

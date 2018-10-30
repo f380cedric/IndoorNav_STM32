@@ -856,7 +856,7 @@ void DWM_WriteSPI_ext(uint8_t address, uint16_t offset, uint8_t *data, uint16_t 
 /* ------------------------------------- */
 /*  DWM1000 COMMUNICATIONS	             */
 /* ------------------------------------- */
-void DWM_SendData(uint8_t* data, uint8_t len){ // data limited to 125 byte long
+void DWM_SendData(uint8_t* data, uint8_t len, uint8_t waitResponse){ // data limited to 125 byte long
 
 	uint8_t fctrl = len+2; // FCS is 2-bytes long
 	/* ** ERIC **/
@@ -870,7 +870,8 @@ void DWM_SendData(uint8_t* data, uint8_t len){ // data limited to 125 byte long
 
 	uint8_t sysCtrl[1];
 	DWM_ReadSPI_ext(SYS_CTRL, NO_SUB, sysCtrl, 1);
-	sysCtrl[0] |= (1<<TXSTRT_BIT) | (1<<WAIT4RESP_BIT);
+	sysCtrl[0] |= 1<<TXSTRT_BIT;
+	sysCtrl[0] |= (waitResponse?1:0)<<WAIT4RESP_BIT;
 	// Set the device in TX mode
 	// Update the DWM1000 module
 	DWM_WriteSPI_ext(SYS_CTRL, NO_SUB, sysCtrl, 1);

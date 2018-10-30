@@ -198,8 +198,9 @@ void DWM_WriteSPI_ext(uint8_t address, uint16_t offset, uint8_t *data, uint16_t 
 * @brief Send data with the DW
 * @param *data the data to send
 * @param len the length of these data
+* @param waitResponse activate Rx after data sent
 */
-void DWM_SendData(uint8_t* data, uint8_t len);
+void DWM_SendData(uint8_t* data, uint8_t len, uint8_t waitResponse);
 
 /**
 * @brief Receive data from the DW communication
