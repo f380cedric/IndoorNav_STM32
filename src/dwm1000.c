@@ -42,23 +42,23 @@ static uint8_t CHANNEL_ValidPreambleCode(struct Channel* channel, uint8_t preamb
 	case _16MHZ:
 		switch (channel->channel) {
 		case _1:
-			if (preambleCode != 1 && preambleCode != 2) {
-				preambleCode = 1;
+			if (preambleCode != 1U && preambleCode != 2U) {
+				preambleCode = 1U;
 			}
 			break;
 		case _2: case _5:
-			if (preambleCode != 3 && preambleCode != 4) {
-				preambleCode = 3;
+			if (preambleCode != 3U && preambleCode != 4U) {
+				preambleCode = 3U;
 			}
 			break;
 		case _3:
-			if (preambleCode != 5 && preambleCode != 6) {
-				preambleCode = 5;
+			if (preambleCode != 5U && preambleCode != 6U) {
+				preambleCode = 5U;
 			}
 			break;
 		case _4: case _7:
-			if (preambleCode != 7 && preambleCode != 8) {
-				preambleCode = 7;
+			if (preambleCode != 7U && preambleCode != 8U) {
+				preambleCode = 7U;
 			}
 			break;
 		}
@@ -66,13 +66,13 @@ static uint8_t CHANNEL_ValidPreambleCode(struct Channel* channel, uint8_t preamb
 	case _64MHZ:
 		switch (channel->channel) {
 		case _1: case _2: case _3: case _5:
-			if (preambleCode < 9 || preambleCode >  12) {
-				preambleCode = 9;
+			if (preambleCode < 9U || preambleCode >  12U) {
+				preambleCode = 9U;
 			}
 			break;
 		case _4: case _7:
-			if (preambleCode < 17 || preambleCode >  20) {
-				preambleCode = 17;
+			if (preambleCode < 17U || preambleCode >  20U) {
+				preambleCode = 17U;
 			}
 			break;
 		}
@@ -285,6 +285,8 @@ static void TRANSMITTER_UpdatePreambleCode(){
 	uint8_t chan[2];
 	DWM_ReadSPI_ext(CHAN_CTRL, 2, chan, 2);
 	uint8_t preambleCode = config.transmitter.channel.preambleCode;
+	chan[0] &= 0x3F;
+	chan[1] &= 0xF8;
 	chan[0] |= preambleCode << 6;
 	chan[1] |= preambleCode >> 2;
 	DWM_WriteSPI_ext(CHAN_CTRL, 2, chan, 2);
@@ -411,7 +413,7 @@ static void RECEIVER_UpdateChannel() {
 }
 
 static void RECEIVER_UpdateBitrate() {
-	uint8_t sys[1];
+	uint8_t sys[1] = {0};
 	uint8_t drxTune0b[2];
 	switch (config.receiver.channel.bitRate) {
 	case _110KBPS:
@@ -430,6 +432,7 @@ static void RECEIVER_UpdatePreambleCode() {
 	uint8_t chan[1];
 	DWM_ReadSPI_ext(CHAN_CTRL, 3, chan, 1);
 	uint8_t preambleCode = config.receiver.channel.preambleCode;
+	chan[0] &= 0x07;
 	chan[0] |= preambleCode << 3;
 	DWM_WriteSPI_ext(CHAN_CTRL, 3, chan, 1);
 }
@@ -454,6 +457,7 @@ static void RECEIVER_UpdatePreambleSize() {
 static void RECEIVER_UpdatePrf() {
 	uint8_t prf[1];
 	DWM_ReadSPI_ext(CHAN_CTRL, 2, prf, 1);
+	prf[0] &= 0xF3;
 	prf[0] |= config.receiver.channel.prf << 2;
 	DWM_WriteSPI_ext(CHAN_CTRL, 2, prf, 1);
 	uint8_t drxTune1a[2];
@@ -527,6 +531,7 @@ static void RECEIVER_Init(void) {
 	RECEIVER_UpdatePrf();
 	RECEIVER_UpdatePreambleCode();
 	RECEIVER_UpdatePreambleSize();
+	RECEIVER_UpdateTimeoutDelay();
 }
 
 void DWM_SetChannel(enum CHANNEL channel) {
