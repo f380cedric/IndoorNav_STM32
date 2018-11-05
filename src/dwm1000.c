@@ -28,7 +28,9 @@ struct Transmitter {
 
 struct Receiver {
 	struct Channel channel;
-	uint16_t timeoutDelay;
+	uint16_t frameTimeoutDelay;
+	uint16_t pac;
+	uint16_t sfd;
 };
 
 struct Config {
@@ -274,6 +276,7 @@ static void TRANSMITTER_UpdateChannel() {
 	}
 	DWM_WriteSPI_ext(RF_CONF,  0x0C, txctrl,  3);
 	DWM_WriteSPI_ext(TX_CAL,  0x0B, tc,  1);
+	TRANSMITTER_UpdateTxPower();
 }
 
 static void TRANSMITTER_UpdateBitrate(){
@@ -346,6 +349,39 @@ static void TRANSMITTER_Init(void) {
 	TRANSMITTER_UpdatePreambleSize();
 }
 
+static void RECEIVER_UpdateSFDTimeout() {
+	uint16_t preambleSize = 4096;
+	uint8_t timeout[2];
+	switch(config.receiver.channel.preambleSize) {
+		case _64:
+			preambleSize = 64;
+			break;
+		case _128:
+			preambleSize = 128;
+			break;
+		case _256:
+			preambleSize = 256;
+			break;
+		case _512:
+			preambleSize = 512;
+			break;
+		case _1024:
+			preambleSize = 1024;
+			break;
+		case _1536:
+			preambleSize = 1536;
+			break;
+		case _2048:
+			preambleSize = 2048;
+			break;
+		case _4096:
+			preambleSize = 4096;
+			break;
+	}
+		short2Bytes(preambleSize + config.receiver.sfd + 1 - config.receiver.pac, timeout);
+                DWM_WriteSPI_ext(DRX_CONF, 0x20, timeout, 2);
+}
+
 static void RECEIVER_UpdatePacSize() {
 	uint8_t drxTune2[4];
 	switch (config.receiver.channel.prf) {
@@ -353,15 +389,19 @@ static void RECEIVER_UpdatePacSize() {
 		switch (config.receiver.channel.preambleSize) {
 		case _64: case _128:
 			int2Bytes(0x311A002DU, drxTune2);
+			config.receiver.pac = 8;
 			break;
 		case _256: case _512:
 			int2Bytes(0x331A0052U, drxTune2);
+			config.receiver.pac = 16;
 			break;
 		case _1024:
 			int2Bytes(0x351A009AU, drxTune2);
+			config.receiver.pac = 32;
 			break;
 		case _1536: case _2048: case _4096:
 			int2Bytes(0x371A011DU, drxTune2);
+			config.receiver.pac = 64;
 			break;
 		}
 		break;
@@ -369,15 +409,19 @@ static void RECEIVER_UpdatePacSize() {
 		switch (config.receiver.channel.preambleSize) {
 		case _64: case _128:
 			int2Bytes(0x313B006BU, drxTune2);
+			config.receiver.pac = 8;
 			break;
 		case _256: case _512:
 			int2Bytes(0x333B00BEU, drxTune2);
+			config.receiver.pac = 16;
 			break;
 		case _1024:
 			int2Bytes(0x353B015EU, drxTune2);
+			config.receiver.pac = 32;
 			break;
 		case _1536: case _2048: case _4096:
 			int2Bytes(0x373B0296U, drxTune2);
+			config.receiver.pac = 64;
 			break;
 		}
 		break;
@@ -385,13 +429,13 @@ static void RECEIVER_UpdatePacSize() {
 	DWM_WriteSPI_ext(DRX_CONF, 0x08, drxTune2, 4);
 }
 
-static void RECEIVER_UpdateTimeoutDelay() {
+static void RECEIVER_UpdateFrameTimeoutDelay() {
 	uint8_t sysCfg[1];
 	DWM_ReadSPI_ext(SYS_CFG, 0x03, sysCfg, 0x01);
 	sysCfg[0] |= (1 << 4);
 	uint8_t rxfwto[2];
-	short2Bytes(config.receiver.timeoutDelay, rxfwto);
-	if (config.receiver.timeoutDelay == 0) {
+	short2Bytes(config.receiver.frameTimeoutDelay, rxfwto);
+	if (config.receiver.frameTimeoutDelay == 0) {
 		sysCfg[0] &= ~(1 << 4);
 	}
 
@@ -419,13 +463,16 @@ static void RECEIVER_UpdateBitrate() {
 	case _110KBPS:
 		short2Bytes(0x000AU, drxTune0b);
 		sys[0] = 1 << 6;
+		config.receiver.sfd = 64;
 		break;
 	case _850KBPS: case _6800KBPS:
 		short2Bytes(0x0001U, drxTune0b);
+		config.receiver.sfd = 8;
 		break;
 	}
 	DWM_WriteSPI_ext(SYS_CFG, 2, sys, 1);
 	DWM_WriteSPI_ext(DRX_CONF, 0x02, drxTune0b, 2);
+	RECEIVER_UpdateSFDTimeout();
 }
 
 static void RECEIVER_UpdatePreambleCode() {
@@ -452,6 +499,7 @@ static void RECEIVER_UpdatePreambleSize() {
 	}
 	DWM_WriteSPI_ext(DRX_CONF, 0x06, drxTune1b, 2);
 	RECEIVER_UpdatePacSize();
+	RECEIVER_UpdateSFDTimeout();
 }
 
 static void RECEIVER_UpdatePrf() {
@@ -517,21 +565,21 @@ void RECEIVER_SetPrf(enum PRF prf) {
 	RECEIVER_UpdatePrf();
 }
 
-void RECEIVER_SetTimeoutDelay(uint16_t timeoutDelay) {
-	config.receiver.timeoutDelay = timeoutDelay;
-	RECEIVER_UpdateTimeoutDelay();
+void RECEIVER_SetRrameTimeoutDelay(uint16_t timeoutDelay) {
+	config.receiver.frameTimeoutDelay = timeoutDelay;
+	RECEIVER_UpdateFrameTimeoutDelay();
 
 }
 
 static void RECEIVER_Init(void) {
 	CHANNEL_Init(&(config.receiver.channel));
-	config.receiver.timeoutDelay = 0;
+	config.receiver.frameTimeoutDelay = 0;
 	RECEIVER_UpdateChannel();
 	RECEIVER_UpdateBitrate();
 	RECEIVER_UpdatePrf();
 	RECEIVER_UpdatePreambleCode();
 	RECEIVER_UpdatePreambleSize();
-	RECEIVER_UpdateTimeoutDelay();
+	RECEIVER_UpdateFrameTimeoutDelay();
 }
 
 void DWM_SetChannel(enum CHANNEL channel) {
@@ -643,7 +691,7 @@ void DWM_Init(void){
 	DWM_ReadSPI_ext(SYS_CFG, 0x03, sysCfg, 1);
 	sysCfg[0] |= 1<<4;
 	DWM_WriteSPI_ext(SYS_CFG, 0x03, sysCfg, 1);*/
-	RECEIVER_SetTimeoutDelay(5000U);
+	RECEIVER_SetFrameTimeoutDelay(5000U);
 #endif
 
 	// setup of the irq
