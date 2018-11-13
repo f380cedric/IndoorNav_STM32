@@ -693,9 +693,22 @@ void DWM_Init(void){
 
 void idle() {
 	// Set the device in IDLE mode
-	uint8_t sysCtrl[1] = { 1 << TRXOFF_BIT};
+	uint8_t sysCtrl[4] = {1 << TRXOFF_BIT};
+	uint8_t ack[4] = {0};
 	// Update the DWM1000 module
-	DWM_WriteSPI_ext(SYS_CTRL, NO_SUB, sysCtrl, 1);
+	uint32_t prim = __get_PRIMASK();
+	__disable_irq();
+	DWM_WriteSPI_ext(SYS_CTRL, NO_SUB, sysCtrl, 4);
+
+	setBit(ack, 4, TX_OK_BIT, 1);
+	uint32_t Rx_mask = RX_FINISHED_MASK | RX_ERROR_MASK;
+	ack[0] |= Rx_mask;
+	ack[1] |= Rx_mask >> 8;
+	ack[2] |= Rx_mask >> 16;
+	ack[3] |= Rx_mask >> 24;
+	// clear IRQ flags on DW
+	DWM_WriteSPI_ext(SYS_STATUS ,NO_SUB, ack, 4);
+	if(!prim){__enable_irq();}
 }
 
 static void DWM_Reset(void){
@@ -810,6 +823,7 @@ void DWM_ReadSPI_ext(uint8_t address, uint16_t offset, uint8_t *data, uint16_t l
 			headerLen += 2;
 		}
 	}
+	uint32_t prim = __get_PRIMASK();
 	__disable_irq();
 	HAL_GPIO_WritePin(SPI1_CS_GPIO_Port, SPI1_CS_Pin, GPIO_PIN_RESET);
 	// Hack write byte by byte to avoid hardfault on HAL_SPI_Transmit with non 2 bytes aligned data
@@ -821,7 +835,7 @@ void DWM_ReadSPI_ext(uint8_t address, uint16_t offset, uint8_t *data, uint16_t l
 	}
 
 	HAL_GPIO_WritePin(SPI1_CS_GPIO_Port, SPI1_CS_Pin, GPIO_PIN_SET);
-	__enable_irq();
+	if(!prim){__enable_irq();}
 }
 
 void DWM_WriteSPI_ext(uint8_t address, uint16_t offset, uint8_t *data, uint16_t len) {
@@ -842,6 +856,7 @@ void DWM_WriteSPI_ext(uint8_t address, uint16_t offset, uint8_t *data, uint16_t 
 			headerLen += 2;
 		}
 	}
+	uint32_t prim = __get_PRIMASK();
 	__disable_irq();
 	HAL_GPIO_WritePin(SPI1_CS_GPIO_Port, SPI1_CS_Pin, GPIO_PIN_RESET);
 	// Hack write byte by byte to avoid hardfault on HAL_SPI_Transmit with non 2 bytes aligned data
@@ -853,7 +868,7 @@ void DWM_WriteSPI_ext(uint8_t address, uint16_t offset, uint8_t *data, uint16_t 
 	}
 
 	HAL_GPIO_WritePin(SPI1_CS_GPIO_Port, SPI1_CS_Pin, GPIO_PIN_SET);
-	__enable_irq();
+	if(!prim){__enable_irq();}
 }
 
 /* ------------------------------------- */
@@ -871,13 +886,17 @@ void DWM_SendData(uint8_t* data, uint8_t len, uint8_t waitResponse){ // data lim
 	// START SENDING
 	// Set bit TXSTRT to 1
 
-	uint8_t sysCtrl[1];
+	uint8_t sysCtrl[4] = {0};
 	DWM_ReadSPI_ext(SYS_CTRL, NO_SUB, sysCtrl, 1);
 	sysCtrl[0] |= 1<<TXSTRT_BIT;
-	sysCtrl[0] |= (waitResponse?1:0)<<WAIT4RESP_BIT;
+	if(waitResponse){
+	sysCtrl[0] |= 1<<WAIT4RESP_BIT;
+	} else {
+	sysCtrl[0] &= ~(1<<WAIT4RESP_BIT);
+	}
 	// Set the device in TX mode
 	// Update the DWM1000 module
-	DWM_WriteSPI_ext(SYS_CTRL, NO_SUB, sysCtrl, 1);
+	DWM_WriteSPI_ext(SYS_CTRL, NO_SUB, sysCtrl, 4);
 }
 
 void DWM_ReceiveData(uint8_t* buffer){
