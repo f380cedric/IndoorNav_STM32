@@ -51,63 +51,26 @@
 /* Private variables ---------------------------------------------------------*/
 SPI_HandleTypeDef hspi1;
 
-UART_HandleTypeDef huart1;
-
 /* USER CODE BEGIN PV */
 /* Private variables ---------------------------------------------------------*/
-uint8_t RxData[128];
-uint8_t TxData[128];
+static uint8_t RxData[128];
+static uint8_t TxData[128];
 
-int SlaveNummer = 1;
-uint8_t master_first_message;
-uint8_t master_second_message;
-uint8_t slave_standard_message;
-
-uint64_t t1, t2, t3, t4, t5, t6;
-uint8_t t1_8[5];
-uint8_t t2_8[5];
-uint8_t t3_8[5];
-uint8_t t4_8[5];
-uint8_t t5_8[5];
-uint8_t t6_8[5];
-
-double tof;
-
-float distance;
-int distancemm[3];
-float distanceMeasured;
-float correctivePol[] = { -0.0081, 0.0928, 0.6569, -0.0612}; // Obtained from matlab
-float previousPos[2];
-
+static uint8_t t2_8[5];
+static uint8_t t3_8[5];
+static uint8_t t6_8[5];
 
 // Boolean variables
-uint8_t TxOk = 0;
-uint8_t RxOk = 0;
-uint8_t RxError = 0;
+static volatile uint8_t TxOk = 0;
+static volatile uint8_t RxOk = 0;
+static volatile uint8_t RxError = 0;
 
-int state;
-
-// UART Variables
-
-int uartLen;
-char uartBuffer[100];
-char uartRx_indx, uartRx_data[2],uartRxBuffer[100], uartTransfer_cplt;
-int uartPress_enter = 0;
-
-// antenna calibration variables
-int measure_counter = 0;
-float moy_distance = 0;
-float moy_tof = 0;
-float sum_square = 0;
-int old_antenna_delay = ANTENNA_DELAY;
-/* USER CODE END PV */
+static volatile enum STATE state;
 
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
 static void MX_SPI1_Init(void);
-static void MX_USART1_UART_Init(void);
-void trilateration2D(int ri[3], float prevPos[2]);
 
 /* USER CODE BEGIN PFP */
 /* Private function prototypes -----------------------------------------------*/
@@ -121,31 +84,29 @@ void trilateration2D(int ri[3], float prevPos[2]);
 int main(void)
 {
 
-  /* USER CODE BEGIN 1 */
-  /* USER CODE END 1 */
+	/* USER CODE BEGIN 1 */
+	/* USER CODE END 1 */
 
-  /* MCU Configuration----------------------------------------------------------*/
+	/* MCU Configuration----------------------------------------------------------*/
 
-  /* Reset of all peripherals, Initializes the Flash interface and the Systick. */
-  HAL_Init();
+	/* Reset of all peripherals, Initializes the Flash interface and the Systick. */
+	HAL_Init();
 
-  /* USER CODE BEGIN Init */
+	/* USER CODE BEGIN Init */
 
-  /* USER CODE END Init */
+	/* USER CODE END Init */
 
-  /* Configure the system clock */
-  SystemClock_Config();
+	/* Configure the system clock */
+	SystemClock_Config();
 
-  /* USER CODE BEGIN SysInit */
+	/* USER CODE BEGIN SysInit */
 
-  /* USER CODE END SysInit */
+	/* USER CODE END SysInit */
 
-  /* Initialize all configured peripherals */
-  MX_GPIO_Init();
-  MX_SPI1_Init();
-  MX_USART1_UART_Init();
-
-  /* USER CODE BEGIN 2 */
+	/* Initialize all configured peripherals */
+	MX_GPIO_Init();
+	MX_SPI1_Init();
+	/* USER CODE BEGIN 2 */
 	_deviceHandle = &hspi1;					// Assign SPI handle
 
 	/* initialisation of the DecaWave */
@@ -153,222 +114,15 @@ int main(void)
 	DWM_Init();
 	state = STATE_INIT;
 
-	previousPos[0] = STARTPOSITIONX;
-	previousPos[1] = STARTPOSITIONY;
+	/* USER CODE END 2 */
 
-	HAL_UART_Receive_IT(&huart1, (uint8_t *)uartRx_data, 1);
+	/* Infinite loop */
+	/* USER CODE BEGIN WHILE */
+	while (1)
+	{
+		/* USER CODE END WHILE */
 
-  /* USER CODE END 2 */
-
-  /* Infinite loop */
-  /* USER CODE BEGIN WHILE */
-  while (1)
-  {
-  /* USER CODE END WHILE */
-
-  /* USER CODE BEGIN 3 */
-#ifdef MASTER_BOARD
-		switch (state){
-				case STATE_INIT :
-						if (SlaveNummer > 3){
-							SlaveNummer = 1;
-
-							//HAL_Delay(90); // 100msec between 2 measures / ~10ms by measure
-						}
-						if (SlaveNummer == 1){
-							master_first_message = 0x11;
-							master_second_message	= 0x21;
-							slave_standard_message	= 0x1A;
-						}
-						else if (SlaveNummer == 2){
-							master_first_message = 0x12;
-							master_second_message	= 0x22;
-							slave_standard_message	= 0x2A;
-						}
-						else {
-							master_first_message = 0x13;
-							master_second_message	= 0x23;
-							slave_standard_message	= 0x3A;
-						}
-						// IDLE to save Power
-						DWM_Disable_Rx();
-						HAL_GPIO_WritePin(GPIOC, LD3_Pin, GPIO_PIN_SET);
-						HAL_GPIO_WritePin(GPIOC, LD4_Pin, GPIO_PIN_RESET);
-						HAL_GPIO_WritePin(GPIOC, LD5_Pin, GPIO_PIN_RESET);
-						HAL_GPIO_WritePin(GPIOC, LD6_Pin, GPIO_PIN_RESET);
-
-						HAL_Delay(1);
-
-						//Send first data
-						TxData[0] = master_first_message;
-						DWM_SendData(TxData, 1);
-
-						//Change state to wait TX OK (polling)
-						state = STATE_WAIT_FIRST_SEND;
-				break;
-
-				case STATE_WAIT_FIRST_SEND:
-					if (TxOk){
-						//get tx time (T1)
-						DWM_ReadSPI_ext(TX_TIME, NO_SUB, t1_8, 5);
-						state = STATE_WAIT_RESPONSE;
-						TxOk = 0;
-						HAL_GPIO_WritePin(GPIOC, LD5_Pin, GPIO_PIN_SET);
-
-					}
-				break;
-
-				case STATE_WAIT_RESPONSE:
-					if (RxError){
-						RxError = 0;
-						state = STATE_INIT;
-					}
-					if (RxOk){
-						// Read Rx buffer
-						DWM_ReceiveData(RxData);
-						// Check RxFrame
-						if (RxData[0] == slave_standard_message){
-							//get rx time (t4)
-							DWM_ReadSPI_ext(RX_TIME, NO_SUB, t4_8, 5);
-
-							//Send second time
-							//HAL_Delay(1);
-							TxData[0] = master_second_message;
-							DWM_SendData(TxData, 1);
-							state = STATE_WAIT_SECOND_SEND;
-							HAL_GPIO_WritePin(GPIOC, LD6_Pin, GPIO_PIN_SET);
-						}
-						else {
-							state = STATE_INIT;
-						}
-						RxOk = 0;
-					}
-				break;
-
-				case STATE_WAIT_SECOND_SEND:
-						if (TxOk){
-						//get tx time (T5)
-							DWM_ReadSPI_ext(TX_TIME, NO_SUB, t5_8, 5);
-							state = STATE_GET_TIMES;
-							TxOk = 0;
-					}
-				break;
-
-				case STATE_GET_TIMES:
-					if (RxError){
-						state = STATE_INIT;
-						RxError = 0;
-					}
-					if (RxOk){
-						//Read Rx Buffer
-						DWM_ReceiveData(RxData);
-
-						HAL_GPIO_WritePin(GPIOC, LD4_Pin, GPIO_PIN_SET);
-						for (int i=0;i<5;i++){
-							t2_8[i] = RxData[i];
-							t3_8[i] = RxData[i+5];
-							t6_8[i] = RxData[i+10];
-						}
-						// Cast all times to uint64
-						t1 = t2 = t3 = t4 = t5 = t6 = 0;
-						for (int i=0;i<5;i++){
-							t1 = (t1 << 8) | t1_8[4-i];
-							t2 = (t2 << 8) | t2_8[4-i];
-							t3 = (t3 << 8) | t3_8[4-i];
-							t4 = (t4 << 8) | t4_8[4-i];
-							t5 = (t5 << 8) | t5_8[4-i];
-							t6 = (t6 << 8) | t6_8[4-i];
-						}
-						if (t6 < t2 || t5 < t1){
-							state = STATE_INIT;
-						}
-						else{
-							state = STATE_COMPUTE_DISTANCE;
-							RxOk = 0;
-						}
-					}
-				break;
-
-				case STATE_COMPUTE_DISTANCE :{
-					uint64_t TroundA = (t4-t1);
-					uint64_t TreplyB = (t3-t2);
-					uint64_t TroundB = (t6-t3);
-					uint64_t TreplyA = (t5-t4);
-					tof = (TroundA + TroundB) - (TreplyA + TreplyB);
-					tof = tof /4;
-					if (TreplyB > TroundA){
-						tof = 0;
-						distance = 0;
-					}
-					else{
-						double distancepicosec = tof/(128*499.2);
-						distanceMeasured = distancepicosec * 299792458 * 0.000001;
-						distance = correctivePol[0];
-						for (int i = 1; i < 4; i++){
-							// polynom evaluation
-							distance = distance * distanceMeasured + correctivePol[i];
-						}
-
-						if (distance < 100){
-							// antenna tunning
-							distancemm[SlaveNummer-1] = distance*1000;
-							if (SlaveNummer == 3){
-								/*#ifdef UART_PLUGGED
-								__disable_irq();
-								uartLen = sprintf(uartBuffer,"[%i,%i,%i] \r\n",distancemm[0],distancemm[1],distancemm[2]);
-								HAL_UART_Transmit(&huart1, (uint8_t *)uartBuffer, uartLen, HAL_MAX_DELAY);
-								__enable_irq();
-								#endif*/
-								trilateration2D(distancemm, previousPos);
-								#ifdef UART_PLUGGED
-								__disable_irq();
-								uartLen = sprintf(uartBuffer,"[%f , %f] #%i \r\n",previousPos[0], previousPos[1], measure_counter);
-								HAL_UART_Transmit(&huart1, (uint8_t *)uartBuffer, uartLen, HAL_MAX_DELAY);
-								__enable_irq();
-								#endif
-								measure_counter ++ ;
-								SlaveNummer = 0;
-								if (measure_counter >= 1000){
-									state = END_STATE;
-									break;
-								}
-							}
-							/*
-							else {
-							#ifdef UART_PLUGGED
-							__disable_irq();
-							uartLen = sprintf(uartBuffer,"%f\n",distance);
-							HAL_UART_Transmit(&huart1, (uint8_t *)uartBuffer, uartLen, HAL_MAX_DELAY);
-							__enable_irq();
-							#endif
-							}
-							*/
-							SlaveNummer ++;
-						}
-					}
-
-					state = STATE_INIT;
-				break;}
-
-				case END_STATE:{
-					HAL_GPIO_WritePin(GPIOC, LD3_Pin, GPIO_PIN_SET);
-					HAL_GPIO_WritePin(GPIOC, LD4_Pin, GPIO_PIN_SET);
-					HAL_GPIO_WritePin(GPIOC, LD5_Pin, GPIO_PIN_SET);
-					HAL_GPIO_WritePin(GPIOC, LD6_Pin, GPIO_PIN_SET);
-					#ifdef UART_PLUGGED
-						__disable_irq();
-						uartLen = sprintf(uartBuffer, "end\n");
-						HAL_UART_Transmit(&huart1, (uint8_t *)uartBuffer, uartLen, HAL_MAX_DELAY);
-						__enable_irq();
-					#endif
-					while (1){
-					HAL_Delay(1000);
-					}
-				break;}
-			}
-#endif
-
-#ifdef SLAVE_BOARD
+		/* USER CODE BEGIN 3 */
 		switch (state){
 			case STATE_INIT :
 				RxError = 0;
@@ -461,10 +215,8 @@ int main(void)
 				}
 			break;
 		}
-#endif
-  }
-  /* USER CODE END 3 */
-
+	}
+	/* USER CODE END 3 */
 }
 
 /** System Clock Configuration
@@ -472,100 +224,79 @@ int main(void)
 void SystemClock_Config(void)
 {
 
-  RCC_OscInitTypeDef RCC_OscInitStruct;
-  RCC_ClkInitTypeDef RCC_ClkInitStruct;
-  RCC_PeriphCLKInitTypeDef PeriphClkInit;
+	RCC_OscInitTypeDef RCC_OscInitStruct;
+	RCC_ClkInitTypeDef RCC_ClkInitStruct;
+	RCC_PeriphCLKInitTypeDef PeriphClkInit;
 
-    /**Initializes the CPU, AHB and APB busses clocks
-    */
-  RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSI;
-  RCC_OscInitStruct.HSIState = RCC_HSI_ON;
-  RCC_OscInitStruct.HSICalibrationValue = 16;
-  RCC_OscInitStruct.PLL.PLLState = RCC_PLL_ON;
-  RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_HSI;
-  RCC_OscInitStruct.PLL.PLLMUL = RCC_PLL_MUL6;
-  RCC_OscInitStruct.PLL.PREDIV = RCC_PREDIV_DIV1;
-  if (HAL_RCC_OscConfig(&RCC_OscInitStruct) != HAL_OK)
-  {
-    _Error_Handler(__FILE__, __LINE__);
-  }
+	  /**Initializes the CPU, AHB and APB busses clocks
+	*/
+	RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSI;
+	RCC_OscInitStruct.HSIState = RCC_HSI_ON;
+	RCC_OscInitStruct.HSICalibrationValue = 16;
+	RCC_OscInitStruct.PLL.PLLState = RCC_PLL_ON;
+	RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_HSI;
+	RCC_OscInitStruct.PLL.PLLMUL = RCC_PLL_MUL6;
+	RCC_OscInitStruct.PLL.PREDIV = RCC_PREDIV_DIV1;
+	if (HAL_RCC_OscConfig(&RCC_OscInitStruct) != HAL_OK)
+	{
+		_Error_Handler(__FILE__, __LINE__);
+	}
 
-    /**Initializes the CPU, AHB and APB busses clocks
-    */
-  RCC_ClkInitStruct.ClockType = RCC_CLOCKTYPE_HCLK|RCC_CLOCKTYPE_SYSCLK
-                              |RCC_CLOCKTYPE_PCLK1;
-  RCC_ClkInitStruct.SYSCLKSource = RCC_SYSCLKSOURCE_PLLCLK;
-  RCC_ClkInitStruct.AHBCLKDivider = RCC_SYSCLK_DIV2;
-  RCC_ClkInitStruct.APB1CLKDivider = RCC_HCLK_DIV1;
+	/**Initializes the CPU, AHB and APB busses clocks
+	*/
+	RCC_ClkInitStruct.ClockType = RCC_CLOCKTYPE_HCLK|RCC_CLOCKTYPE_SYSCLK
+		|RCC_CLOCKTYPE_PCLK1;
+	RCC_ClkInitStruct.SYSCLKSource = RCC_SYSCLKSOURCE_PLLCLK;
+	RCC_ClkInitStruct.AHBCLKDivider = RCC_SYSCLK_DIV2;
+	RCC_ClkInitStruct.APB1CLKDivider = RCC_HCLK_DIV1;
 
-  if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_0) != HAL_OK)
-  {
-    _Error_Handler(__FILE__, __LINE__);
-  }
+	if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_0) != HAL_OK)
+	{
+		_Error_Handler(__FILE__, __LINE__);
+	}
 
-  PeriphClkInit.PeriphClockSelection = RCC_PERIPHCLK_USART1;
-  PeriphClkInit.Usart1ClockSelection = RCC_USART1CLKSOURCE_PCLK1;
-  if (HAL_RCCEx_PeriphCLKConfig(&PeriphClkInit) != HAL_OK)
-  {
-    _Error_Handler(__FILE__, __LINE__);
-  }
+	PeriphClkInit.PeriphClockSelection = RCC_PERIPHCLK_USART1;
+	PeriphClkInit.Usart1ClockSelection = RCC_USART1CLKSOURCE_PCLK1;
+	if (HAL_RCCEx_PeriphCLKConfig(&PeriphClkInit) != HAL_OK)
+	{
+		_Error_Handler(__FILE__, __LINE__);
+	}
 
-    /**Configure the Systick interrupt time
-    */
-  HAL_SYSTICK_Config(HAL_RCC_GetHCLKFreq()/1000);
+	/**Configure the Systick interrupt time
+	*/
+	HAL_SYSTICK_Config(HAL_RCC_GetHCLKFreq()/1000);
 
-    /**Configure the Systick
-    */
-  HAL_SYSTICK_CLKSourceConfig(SYSTICK_CLKSOURCE_HCLK);
+	/**Configure the Systick
+	*/
+	HAL_SYSTICK_CLKSourceConfig(SYSTICK_CLKSOURCE_HCLK);
 
-  /* SysTick_IRQn interrupt configuration */
-  HAL_NVIC_SetPriority(SysTick_IRQn, 0, 0);
+	/* SysTick_IRQn interrupt configuration */
+	HAL_NVIC_SetPriority(SysTick_IRQn, 0, 0);
 }
 
 /* SPI1 init function */
 static void MX_SPI1_Init(void)
 {
 
-  /* SPI1 parameter configuration*/
-  hspi1.Instance = SPI1;
-  hspi1.Init.Mode = SPI_MODE_MASTER;
-  hspi1.Init.Direction = SPI_DIRECTION_2LINES;
-  hspi1.Init.DataSize = SPI_DATASIZE_8BIT;
-  hspi1.Init.CLKPolarity = SPI_POLARITY_LOW;
-  hspi1.Init.CLKPhase = SPI_PHASE_1EDGE;
-  hspi1.Init.NSS = SPI_NSS_SOFT;
-  hspi1.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_8;
-  hspi1.Init.FirstBit = SPI_FIRSTBIT_MSB;
-  hspi1.Init.TIMode = SPI_TIMODE_DISABLE;
-  hspi1.Init.CRCCalculation = SPI_CRCCALCULATION_DISABLE;
-  hspi1.Init.CRCPolynomial = 7;
-  hspi1.Init.CRCLength = SPI_CRC_LENGTH_DATASIZE;
-  hspi1.Init.NSSPMode = SPI_NSS_PULSE_DISABLE;
-  if (HAL_SPI_Init(&hspi1) != HAL_OK)
-  {
-    _Error_Handler(__FILE__, __LINE__);
-  }
-
-}
-
-/* USART1 init function */
-static void MX_USART1_UART_Init(void)
-{
-
-  huart1.Instance = USART1;
-  huart1.Init.BaudRate = 9600;
-  huart1.Init.WordLength = UART_WORDLENGTH_8B;
-  huart1.Init.StopBits = UART_STOPBITS_1;
-  huart1.Init.Parity = UART_PARITY_NONE;
-  huart1.Init.Mode = UART_MODE_TX_RX;
-  huart1.Init.HwFlowCtl = UART_HWCONTROL_NONE;
-  huart1.Init.OverSampling = UART_OVERSAMPLING_16;
-  huart1.Init.OneBitSampling = UART_ONE_BIT_SAMPLE_DISABLE;
-  huart1.AdvancedInit.AdvFeatureInit = UART_ADVFEATURE_NO_INIT;
-  if (HAL_UART_Init(&huart1) != HAL_OK)
-  {
-    _Error_Handler(__FILE__, __LINE__);
-  }
+	/* SPI1 parameter configuration*/
+	hspi1.Instance = SPI1;
+	hspi1.Init.Mode = SPI_MODE_MASTER;
+	hspi1.Init.Direction = SPI_DIRECTION_2LINES;
+	hspi1.Init.DataSize = SPI_DATASIZE_8BIT;
+	hspi1.Init.CLKPolarity = SPI_POLARITY_LOW;
+	hspi1.Init.CLKPhase = SPI_PHASE_1EDGE;
+	hspi1.Init.NSS = SPI_NSS_SOFT;
+	hspi1.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_8;
+	hspi1.Init.FirstBit = SPI_FIRSTBIT_MSB;
+	hspi1.Init.TIMode = SPI_TIMODE_DISABLE;
+	hspi1.Init.CRCCalculation = SPI_CRCCALCULATION_DISABLE;
+	hspi1.Init.CRCPolynomial = 7;
+	hspi1.Init.CRCLength = SPI_CRC_LENGTH_DATASIZE;
+	hspi1.Init.NSSPMode = SPI_NSS_PULSE_DISABLE;
+	if (HAL_SPI_Init(&hspi1) != HAL_OK)
+	{
+		_Error_Handler(__FILE__, __LINE__);
+	}
 
 }
 
@@ -680,97 +411,7 @@ static void MX_GPIO_Init(void)
 }
 
 /* USER CODE BEGIN 4 */
-#ifdef MASTER_BOARD
-void trilateration2D(int ri[3], float prevPos[2]){
-    int p[3][2];
-    p[0][0] = BEACONPOS1X;
-    p[0][1] = BEACONPOS1Y;
-    p[1][0] = BEACONPOS2X;
-    p[1][1] = BEACONPOS2Y;
-    p[2][0] = BEACONPOS3X;
-    p[2][1] = BEACONPOS3Y;
-
-    // computing a
-    float a[2] = {0,0};
-    float ppTp[2] = {0,0};
-    float rp[2] = {0,0};
-    for (int i=0; i<3;i++){
-        ppTp[0] += pow(p[i][0],3) + p[i][0] * pow(p[i][1],2);
-        ppTp[1] += pow(p[i][1],3) + p[i][1] * pow(p[i][0],2);
-        rp[0] += p[i][0] * pow(ri[i],2);
-        rp[1] += p[i][1] * pow(ri[i],2);
-    }
-    for (int i=0;i<2;i++){
-        a[i] = (ppTp[i]-rp[i])/3.0;
-    }
-
-    // computing B
-    float B[2][2] = {{0,0},{0,0}};
-    float ppT[2][2] = {{0,0},{0,0}};
-    float pTpI[2][2] = {{0,0},{0,0}};
-    float rI[2][2] = {{0,0},{0,0}};
-    for (int i=0;i<3;i++){
-        for(int j=0;j<2;j++){
-            for(int k=0;k<2;k++){
-                ppT[j][k] += p[i][j] * p[i][k];
-            }
-
-            pTpI[j][j] += pow(p[i][0],2) + pow(p[i][1],2);
-            rI[j][j] += pow(ri[i],2);
-        }
-    }
-    for (int i=0;i<2;i++){
-        for (int j=0;j<2;j++){
-            B[i][j] = (-2.0*ppT[i][j] - pTpI[i][j] + rI[i][j])/3;
-        }
-    }
-
-    // computing c
-    float c[2] = {0,0};
-    for (int i=0;i<3;i++){
-        for(int j=0;j<2;j++){
-            c[j] += p[i][j];
-        }
-    }
-    for (int i=0;i<2;i++){
-        c[i] = c[i]/3.0;
-    }
-
-    // computing f
-    float f[2] = {0,0};
-    float ccTc[2] = {0,0};
-    float Bc[2] = {0,0};
-    ccTc[0] = 2*(pow(c[0],3) + c[0] * pow(c[1],2));
-    ccTc[1] = 2*(pow(c[1],3) + c[1] * pow(c[0],2));
-    Bc[0] = B[0][0]*c[0] + B[0][1]*c[1];
-    Bc[1] = B[1][0]*c[0] + B[1][1]*c[1];
-    for (int i=0;i<2;i++){
-        f[i] = a[i] + Bc[i] + ccTc[i];
-    }
-
-    // H
-    float H[2][2] = {{0,0},{0,0}};
-    float ccT[2][2] = {{0,0},{0,0}};
-    for(int i=0;i<2;i++){
-        for(int j=0;j<2;j++){
-            ccT[i][j] = c[i]*c[j];
-            H[i][j] = -2.0/3.0 * ppT [i][j] + 2*ccT[i][j];
-        }
-    }
-		// H-1
-		// det(H)
-		float detH = H[0][0]*H[1][1] - H[0][1]*H[1][0];
-		float invH[2][2] = {{H[1][1]/detH, -H[0][1]/detH},{-H[1][0]/detH,H[0][0]/detH}};
-
-		//q = -h-1*f
-		float q[2] = {-invH[0][0]*f[0] - invH[0][1]*f[1],-invH[1][0]*f[0] - invH[1][1]*f[1]};
-
-		prevPos[0] = c[0] + q[0];
-		prevPos[1] = c[1] + q[1];
-}
-#endif
 void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin){
-	if (GPIO_Pin == B1_Pin) {state = END_STATE;}
 	if (GPIO_Pin != SPI_IRQ_Pin){return;}
 	uint8_t RxBuffer[4];
 	uint32_t StatusRegister;
@@ -802,19 +443,9 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin){
 		ack[2] |= RX_ERROR_MASK >> 16;
 		ack[3] |= RX_ERROR_MASK >> 24;
 		RxError = 1;
-		RxOk = 0;
 	}
 	// clear IRQ flags on DW
 	DWM_WriteSPI_ext(SYS_STATUS ,NO_SUB, ack, 4);
-}
-
-void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart){
-	if (huart->Instance == USART1){  //current UART
-		if (uartRx_data[0]==13){ //if received data is ascii 13 (enter)
-			uartPress_enter = 1;
-		}
-		HAL_UART_Receive_IT(&huart1, (uint8_t *)uartRx_data, 1);
-	}
 }
 
 /* USER CODE END 4 */

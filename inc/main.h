@@ -105,33 +105,9 @@
 //#define SLAVE2_BOARD
 //#define SLAVE3_BOARD
 
-//#define MASTER_BOARD
-
-#define UART_PLUGGED
-
-// Beacon positions
-#define BEACONPOS1X 	0
-#define BEACONPOS1Y	0
-#define BEACONPOS2X 	0
-#define BEACONPOS2Y	2000
-#define BEACONPOS3X 	2800
-#define BEACONPOS3Y	1000
-
-#define STARTPOSITIONX	1400
-#define STARTPOSITIONY	1600
-
-/*
-//Optimal
-float beacon1[2] = {-50,-50};
-float beacon2[2] = {3050,-50};
-float beacon3[2] = {1500,2050};
-*/
 
 // Antenna calibration
 #define ANTENNA_DELAY 	0x8000 //Offset for error at -50cm  //0x8066 // precis 10cm
-#define THEORETICAL_DISTANCE	5.1
-
-#define ADRESS_AND_PAN		0x000000FF
 
 #ifdef SLAVE1_BOARD
 #define SLAVE_BOARD
@@ -157,23 +133,16 @@ float beacon3[2] = {1500,2050};
 #define TX_OK_MASK		0x00000080U // TX OK
 #define RX_FINISHED_MASK	0x00006400U // RX FINISHED
 #define RX_ERROR_MASK		0x04279000U // RX ERROR
-//TODO Remove Master and use enum
-// State Machine Master
-#define STATE_INIT		1
-#define STATE_WAIT_FIRST_SEND	2
-#define STATE_WAIT_RESPONSE	3
-#define STATE_WAIT_SECOND_SEND	4
-#define STATE_GET_TIMES		5
-#define STATE_COMPUTE_DISTANCE	6
-#define END_STATE		7
 // State Machine Slave
-#define STATE_INIT		1
-#define STATE_WAIT_RECEIVE	2
-#define STATE_MESSAGE_1		3
-#define STATE_MESSAGE_2		4
-#define STATE_SEND_TIMES	5
-#define STATE_END_CYCLE		6
-#define STATE_SEND_RESPONSE	7
+enum STATE {
+STATE_INIT,
+STATE_WAIT_RECEIVE,
+STATE_MESSAGE_1,	
+STATE_MESSAGE_2,
+STATE_SEND_TIMES,
+STATE_END_CYCLE,
+STATE_SEND_RESPONSE,
+};
 
 /* USER CODE END Private defines */
 

@@ -626,73 +626,29 @@ void DWM_Init(void){
 			HAL_Delay(100);
 		}
 	}
-	/*// Set RX 110kbps
-	uint8_t sysCfg[2];
-	sysCfg[1] = 0x00;
-	sysCfg[0] = 1<<6;
-	DWM_WriteSPI_ext(SYS_CFG, 0x02, sysCfg, 2);
-
-	// CHAN_CTRL: set RXPRF 01
-	uint8_t chanCtrl[1];
-	chanCtrl[0] = 1<<2;
-	DWM_WriteSPI_ext(CHAN_CTRL, 0x02, chanCtrl, 1);*/
 
 /****************************************************************************************
  * *************************************************************************************/
 
-	/*// DEFAULT CONFIGURATION THAT SOULD BE MODIFIED (SECTION 2.5.5 OF USER MANUAL)
-	// AGC_TUNE1
-	uint8_t agc_tune1[] = {0x70, 0X88};
-	DWM_WriteSPI_ext(AGC_CTRL, 0x04, agc_tune1, 2);*/
+	// DEFAULT CONFIGURATION THAT SOULD BE MODIFIED (SECTION 2.5.5 OF USER MANUAL)
 
 	//AGC_TUNE2
 	uint8_t agc_tune2[] = {0x07, 0xA9, 0x02, 0x25};
 	DWM_WriteSPI_ext(AGC_CTRL, 0x0C, agc_tune2, 4);
 
-	/*// DRX_TUNE2
-        uint8_t drx_tune2[] = {0x2d, 0x00, 0x1a, 0x31};
-        DWM_WriteSPI_ext(DRX_CONF, 0x08, drx_tune2, 4);*/
-
         // LDE_CFG1: NTM
-        uint8_t lde_cfg1[] = {0x6d};
+        uint8_t lde_cfg1[] = {0x6d};	// LOS CONFIGURATION
+	//uint8_t lde_cfg1[] = {0x07};	// NLOS CONFIGURATION
         DWM_WriteSPI_ext(LDE_CTRL, 0x0806, lde_cfg1, 1);
 
-        /*// LDE_CFG2
-        uint8_t lde_cfg2[] = {0x07, 0x16};
-        DWM_WriteSPI_ext(LDE_CTRL, 0x1806, lde_cfg2, 2);
-
-        // TX_POWER
-        uint8_t tx_power[] = {0x48, 0x28, 0x08, 0x0e};
-        DWM_WriteSPI_ext(TX_POWER,NO_SUB, tx_power, 4);
-
-        // RF_TXCTRL
-        uint8_t rf_txctrl[] = {0xe0, 0x3f, 0x1e};
-        DWM_WriteSPI_ext(RF_CONF, 0x0c, rf_txctrl, 3);
-
-        // TC_PGDELAY
-        uint8_t tc_pgdelay[] = {0xc0};
-        DWM_WriteSPI_ext(TX_CAL, 0x0b, tc_pgdelay, 1);
-
-        // FS_PLLTUNE
-        uint8_t fs_plltune[] = {0xbe};
-        DWM_WriteSPI_ext(FS_CTRL, 0x0b, fs_plltune, 1);*/
+        // LDE_CFG2
+        //uint8_t lde_cfg2[] = {0x07, 0x16};
+        // NLOS CONFIGURATION
+        //uint8_t lde_cfg2[] = {0x03, 0x00};
+        //DWM_WriteSPI_ext(LDE_CTRL, 0x1806, lde_cfg2, 2);
 
 /****************************************************************************************
  * *************************************************************************************/
-
-	/*// TX_FCTRL: TR & TXBR to 110k
-	uint8_t fctrl[] = {0x80};
-	DWM_WriteSPI_ext(TX_FCTRL, 0x01, fctrl, 1);*/
-
-	// setup Rx Timeout 5ms
-#ifdef MASTER_BOARD
-	/*uint8_t timeout[] = {0x88, 0x13};
-	DWM_WriteSPI_ext(RX_FWTO,NO_SUB, timeout, 2);
-	DWM_ReadSPI_ext(SYS_CFG, 0x03, sysCfg, 1);
-	sysCfg[0] |= 1<<4;
-	DWM_WriteSPI_ext(SYS_CFG, 0x03, sysCfg, 1);*/
-	RECEIVER_SetFrameTimeoutDelay(5000U);
-#endif
 
 	// setup of the irq
 	uint8_t sysMask[SYS_MASK_LEN];
@@ -712,9 +668,11 @@ void DWM_Init(void){
 
 	// antenna delay
 	uint8_t delayuint8[2];
-	delayuint8[1] = (ANTENNA_DELAY & 0xFF00) >>8;
-	delayuint8[0] = (ANTENNA_DELAY & 0xFF);
-	DWM_WriteSPI_ext(TX_ANTD, NO_SUB, delayuint8, 2);
+        uint16_t antennaDelay = ANTENNA_DELAY >> 1;
+        delayuint8[1] = (antennaDelay & 0xFF00) >>8;
+        delayuint8[0] = (antennaDelay & 0xFF);
+        DWM_WriteSPI_ext(TX_ANTD, NO_SUB, delayuint8, 2);
+        DWM_WriteSPI_ext(LDE_CTRL, 0x1804, delayuint8, 2);
 
 	HAL_GPIO_WritePin(GPIOC, LD6_Pin, GPIO_PIN_SET);
 	HAL_Delay(100);
@@ -779,7 +737,6 @@ static void DWM_Reset(void){
 	pmscCtrl0[1] = 0x02;
 
 	DWM_WriteSPI_ext(PMSC, PMSC_CTRL0, pmscCtrl0, 2);
-
 }
 
 void DWM_Reset_Rx(){
@@ -790,8 +747,7 @@ void DWM_Reset_Rx(){
 	DWM_WriteSPI_ext(PMSC, 0x03, pmscCtrl0, 1);
 }
 void DWM_Enable_Rx(void){
-	uint8_t TxBuf8[4];
-	memset(TxBuf8, 0, 4);
+	uint8_t TxBuf8[4] = {0};
 	setBit(TxBuf8,4,8,1);
 	DWM_WriteSPI_ext(SYS_CTRL, NO_SUB, TxBuf8, 4);
 }
@@ -837,8 +793,7 @@ void short2Bytes(const uint16_t	dataShort, uint8_t data[2]) {
 /*  RAW READ-WRITE FUNCTIONS             */
 /* ------------------------------------- */
 void DWM_ReadSPI_ext(uint8_t address, uint16_t offset, uint8_t *data, uint16_t len) {
-	uint8_t header[3];
-	memset(header,0,3);
+	uint8_t header[3] = {0};
 	uint16_t i = 0;
 	uint8_t headerLen = 1;
 
