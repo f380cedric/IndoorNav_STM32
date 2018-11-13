@@ -107,7 +107,8 @@
 
 
 // Antenna calibration
-#define ANTENNA_DELAY 	0x8000 //Offset for error at -50cm  //0x8066 // precis 10cm
+//#define ANTENNA_DELAY        65610U //Offset for error at -50cm  //0x8066 // precis 10cm
+#define ANTENNA_DELAY          65670U
 
 #ifdef SLAVE1_BOARD
 #define SLAVE_BOARD
