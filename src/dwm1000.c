@@ -565,7 +565,7 @@ void RECEIVER_SetPrf(enum PRF prf) {
 	RECEIVER_UpdatePrf();
 }
 
-void RECEIVER_SetRrameTimeoutDelay(uint16_t timeoutDelay) {
+void RECEIVER_SetFrameTimeoutDelay(uint16_t timeoutDelay) {
 	config.receiver.frameTimeoutDelay = timeoutDelay;
 	RECEIVER_UpdateFrameTimeoutDelay();
 
