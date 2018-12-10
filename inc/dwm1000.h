@@ -74,6 +74,22 @@
 #define READ_SUB	0x40U
 #define RW_SUB_EXT	0x80U
 
+struct FrameShort {
+	uint8_t fc[2];
+	uint8_t seq;
+	uint8_t dstPanId[2];
+	uint8_t dstAddr[2];
+	uint8_t srcAddr[2];
+	uint8_t data[116];
+};
+
+struct Message {
+	uint8_t length;
+	union {
+		uint8_t frame[125];
+		struct FrameShort frameShort;
+	} msg;
+};
 
 enum CHANNEL { _1 = 1U, _2 = 2U, _3 = 3U, _4 = 4U, _5 = 5U, _7 = 7U };
 
@@ -205,7 +221,12 @@ void DWM_SendData(uint8_t* data, uint8_t len, uint8_t waitResponse);
 /**
 * @brief Receive data from the DW communication
 * @param *buffer where to store the data
+* @param *length where to store the data length
 */
-void DWM_ReceiveData(uint8_t* buffer);
+void DWM_ReceiveData(uint8_t* buffer, uint8_t* length);
+/**
+ * @brief Set receiver frame timeout
+ * @param timeoutDelay the timeout in µs
+ */
 
 #endif /* __DWM1000_H */
