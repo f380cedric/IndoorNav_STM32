@@ -228,5 +228,6 @@ void DWM_ReceiveData(uint8_t* buffer, uint8_t* length);
  * @brief Set receiver frame timeout
  * @param timeoutDelay the timeout in µs
  */
+void RECEIVER_SetFrameTimeoutDelay(uint16_t timeoutDelay);
 
 #endif /* __DWM1000_H */

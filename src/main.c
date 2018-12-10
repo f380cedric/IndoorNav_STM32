@@ -53,18 +53,11 @@ SPI_HandleTypeDef hspi1;
 
 /* USER CODE BEGIN PV */
 /* Private variables ---------------------------------------------------------*/
-static uint8_t RxData[128];
-static uint8_t TxData[128];
-
-static uint8_t t2_8[5];
-static uint8_t t3_8[5];
-static uint8_t t6_8[5];
-
 // Boolean variables
 static volatile uint8_t TxOk = 0;
 static volatile uint8_t RxOk = 0;
 static volatile uint8_t RxError = 0;
-
+static volatile uint8_t TimeOut = 0;
 static volatile enum STATE state;
 
 /* Private function prototypes -----------------------------------------------*/
@@ -111,6 +104,36 @@ int main(void)
 
 	/* initialisation of the DecaWave */
 	HAL_Delay(10); //time for the DW to go from Wakeup to init and then IDLE
+	struct Message masterMessage;
+	struct Message slaveResponse;
+	struct Message slaveTimes;
+	slaveResponse.msg.frameShort.fc[0] = 0x41U;
+	slaveResponse.msg.frameShort.fc[1] = 0x88U;
+	slaveResponse.msg.frameShort.seq = 0;
+	slaveResponse.msg.frameShort.dstPanId[0] = (uint8_t)PANID;
+	slaveResponse.msg.frameShort.dstPanId[1] = PANID >> 8;
+	slaveResponse.msg.frameShort.srcAddr[0] = (uint8_t)ADDRESS;
+	slaveResponse.msg.frameShort.srcAddr[1] = ADDRESS >> 8;
+	slaveResponse.msg.frameShort.data[0] = 0x01;
+	for(int i = 0; i < 4; ++i) {
+		slaveResponse.msg.frameShort.data[1+i] = SLAVE_COORDINATE_X >> (i*8);
+		slaveResponse.msg.frameShort.data[5+i] = SLAVE_COORDINATE_Y >> (i*8);
+		slaveResponse.msg.frameShort.data[9+i] = SLAVE_COORDINATE_Z >> (i*8);
+	}
+
+	slaveResponse.length = 27;
+
+	slaveTimes.msg.frameShort.fc[0] = 0x41U;
+	slaveTimes.msg.frameShort.fc[1] = 0x88U;
+	slaveTimes.msg.frameShort.seq = 0;
+	slaveTimes.msg.frameShort.dstPanId[0] = (uint8_t)PANID;
+	slaveTimes.msg.frameShort.dstPanId[1] = PANID >> 8;
+	slaveTimes.msg.frameShort.srcAddr[0] = (uint8_t)ADDRESS;
+	slaveTimes.msg.frameShort.srcAddr[1] = ADDRESS >> 8;
+	slaveTimes.msg.frameShort.data[0] = 0x03;
+	slaveTimes.length = 20;
+
+	uint8_t tagAddress[2]={0xFF,0xFF};
 	DWM_Init();
 	state = STATE_INIT;
 
@@ -125,11 +148,12 @@ int main(void)
 		/* USER CODE BEGIN 3 */
 		switch (state){
 			case STATE_INIT :
+				RECEIVER_SetFrameTimeoutDelay(0);
 				RxError = 0;
 				TxOk = 0;
 				RxOk = 0;
 				DWM_Enable_Rx();
-				state = STATE_WAIT_RECEIVE;
+				state = STATE_WAIT_POLL;
 				#ifdef SLAVE1_BOARD
 				HAL_GPIO_WritePin(GPIOC, LD3_Pin, GPIO_PIN_RESET);
 				HAL_GPIO_WritePin(GPIOC, LD4_Pin, GPIO_PIN_SET);
@@ -150,61 +174,93 @@ int main(void)
 				#endif
 			break;
 
-			case STATE_WAIT_RECEIVE :
+			case STATE_WAIT_POLL:
 				if (RxError){
+					RxError = 0;
+					RxOk = 0;
 					DWM_Reset_Rx();
-					state = STATE_INIT;
+					DWM_Enable_Rx();
 				} else if (RxOk){
 					// Read Rx buffer
-					DWM_ReceiveData(RxData);
+					DWM_ReceiveData(masterMessage.msg.frame, &masterMessage.length);
 					// Check RxFrame
-					if (RxData[0] == MASTER_FIRST_MESSAGE){
-						state = STATE_MESSAGE_1;
+					if ((masterMessage.msg.frameShort.fc[0]+(masterMessage.msg.frameShort.fc[1]<<8) == 0x8841U) &&
+							(masterMessage.msg.frameShort.dstAddr[0]+(masterMessage.msg.frameShort.dstAddr[1]<<8)
+								== BROADCAST) &&
+							(masterMessage.msg.frameShort.dstPanId[0] +(masterMessage.msg.frameShort.dstPanId[1]<<8)
+								== PANID) &&
+							masterMessage.msg.frameShort.data[0] == 0){
+						tagAddress[0] = masterMessage.msg.frameShort.srcAddr[0];
+						tagAddress[1] = masterMessage.msg.frameShort.srcAddr[1];
+						slaveResponse.msg.frameShort.dstAddr[0] = tagAddress[0];
+						slaveResponse.msg.frameShort.dstAddr[1] = tagAddress[1];
+						slaveTimes.msg.frameShort.dstAddr[0] = tagAddress[0];
+						slaveTimes.msg.frameShort.dstAddr[1] = tagAddress[1];
+						RECEIVER_SetFrameTimeoutDelay(20000);
+						TimeOut = 0;
+						state = STATE_SEND_RESPONSE;
 						HAL_GPIO_WritePin(GPIOC, LD5_Pin, GPIO_PIN_SET);
 						HAL_GPIO_WritePin(GPIOC, LD3_Pin, GPIO_PIN_RESET);
 					}
-					else if (RxData[0] == MASTER_SECOND_MESSAGE){
-						state = STATE_MESSAGE_2;
-						HAL_GPIO_WritePin(GPIOC, LD3_Pin, GPIO_PIN_SET);
-					}
-					else {state = STATE_INIT;}
+					else {DWM_Enable_Rx();}
 					RxOk = 0;
 				}
 			break;
 
-			case STATE_MESSAGE_1:
+			case STATE_SEND_RESPONSE:
 				// get T2
-				DWM_ReadSPI_ext(RX_TIME,NO_SUB, t2_8,5);
+				DWM_ReadSPI_ext(RX_TIME,NO_SUB, &slaveResponse.msg.frameShort.data[13],5);
 				//HAL_Delay(1);
-				TxData[0] = SLAVE_STANDARD_MESSAGE;
-				DWM_SendData(TxData, 1, 1);
-				state = STATE_SEND_RESPONSE;
+				HAL_Delay(50-WAIT4RESP_DELAY/1000);
+				DWM_SendData(slaveResponse.msg.frame, slaveResponse.length, 1);
+				state = STATE_WAIT_SEND_RESPONSE;
 			break;
 
-			case STATE_SEND_RESPONSE :
+			case STATE_WAIT_SEND_RESPONSE:
 				if (TxOk){
 					//get tx time (T3)
 					HAL_GPIO_WritePin(GPIOC, LD6_Pin, GPIO_PIN_SET);
-					DWM_ReadSPI_ext(TX_TIME, NO_SUB, t3_8, 5);
+					DWM_ReadSPI_ext(TX_TIME, NO_SUB, &slaveTimes.msg.frameShort.data[1], 5);
 					TxOk = 0;
-					state = STATE_WAIT_RECEIVE;
+					state = STATE_WAIT_FINAL;
 				}
 			break;
 
-			case STATE_MESSAGE_2 :
-				//get T6
-				DWM_ReadSPI_ext(RX_TIME, NO_SUB, t6_8,5);
-				state = STATE_SEND_TIMES;
+			case STATE_WAIT_FINAL:
+				if (RxError){
+					RxError = 0;
+					RxOk = 0;
+					DWM_Reset_Rx();
+					if(TimeOut) {
+						state = STATE_INIT;
+						break;
+					}
+					DWM_Enable_Rx();
+				} else if (RxOk){
+					// Read Rx buffer
+					DWM_ReceiveData(masterMessage.msg.frame, &masterMessage.length);
+					// Check RxFrame
+					if ((masterMessage.msg.frameShort.fc[0]+(masterMessage.msg.frameShort.fc[1]<<8) == 0x8841U) &&
+							(masterMessage.msg.frameShort.dstAddr[0]+(masterMessage.msg.frameShort.dstAddr[1]<<8)
+								== BROADCAST) &&
+							(masterMessage.msg.frameShort.dstPanId[0] +(masterMessage.msg.frameShort.dstPanId[1]<<8)
+								== PANID) &&
+							masterMessage.msg.frameShort.data[0] == 2 &&
+							masterMessage.msg.frameShort.srcAddr[0] == tagAddress[0] &&
+							masterMessage.msg.frameShort.srcAddr[1] == tagAddress[1]){
+						HAL_GPIO_WritePin(GPIOC, LD3_Pin, GPIO_PIN_SET);
+						state = STATE_SEND_TIMES;
+					}
+					else {DWM_Enable_Rx();}
+					RxOk = 0;
+				}
 			break;
 
 			case STATE_SEND_TIMES :
-				for (int i=0; i<5; i++){
-					TxData[i] = t2_8[i];
-					TxData[i+5] = t3_8[i];
-					TxData[i+10] = t6_8[i];
-				}
+				DWM_ReadSPI_ext(RX_TIME, NO_SUB, &slaveTimes.msg.frameShort.data[6],5);
+				HAL_Delay(50-WAIT4RESP_DELAY/1000);
 				//HAL_Delay(1);
-				DWM_SendData(TxData, 15, 0);
+				DWM_SendData(slaveTimes.msg.frame, slaveTimes.length, 0);
 
 				state = STATE_END_CYCLE;
 			break;
@@ -442,6 +498,9 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin){
 		ack[1] |= RX_ERROR_MASK >> 8;
 		ack[2] |= RX_ERROR_MASK >> 16;
 		ack[3] |= RX_ERROR_MASK >> 24;
+		if (StatusRegister & (1<<17)) {
+			TimeOut = 1;
+		}
 		RxError = 1;
 	}
 	// clear IRQ flags on DW

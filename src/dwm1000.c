@@ -650,6 +650,23 @@ void DWM_Init(void){
 /****************************************************************************************
  * *************************************************************************************/
 
+	// setup Address and PAN ID
+	uint8_t temp[4];
+	temp[0] = (uint8_t)ADDRESS;
+	temp[1] = ADDRESS >> 8;
+	temp[2] = (uint8_t)PANID;
+	temp[3] = PANID >> 8;
+	DWM_WriteSPI_ext(PANADR, NO_SUB, temp, 4);
+
+	// Set MAC filter (Data)
+	temp[0] = 0x9;
+	DWM_WriteSPI_ext(SYS_CFG, NO_SUB, temp, 1);
+
+	// setup Wait4Resp delay
+	temp[0] = (uint8_t)WAIT4RESP_DELAY;
+	temp[1] = (uint8_t)(WAIT4RESP_DELAY>>8);
+	temp[2] = (uint8_t)(WAIT4RESP_DELAY>>16);
+	DWM_WriteSPI_ext(ACK_RESP_T, NO_SUB, temp, 3);
 	// setup of the irq
 	uint8_t sysMask[SYS_MASK_LEN];
 	DWM_ReadSPI_ext(SYS_MASK, NO_SUB, sysMask, SYS_MASK_LEN);
@@ -664,6 +681,7 @@ void DWM_Init(void){
 	setBit(sysMask,SYS_MASK_LEN,18,1);// RX ERROR
 	setBit(sysMask,SYS_MASK_LEN,21,1);// RX ERROR
 	setBit(sysMask,SYS_MASK_LEN,26,1);// RX ERROR
+	setBit(sysMask,SYS_MASK_LEN,29,1);// RX MAC REJECT
 	DWM_WriteSPI_ext(SYS_MASK, NO_SUB, sysMask, SYS_MASK_LEN);
 
 	// antenna delay
@@ -899,11 +917,12 @@ void DWM_SendData(uint8_t* data, uint8_t len, uint8_t waitResponse){ // data lim
 	DWM_WriteSPI_ext(SYS_CTRL, NO_SUB, sysCtrl, 4);
 }
 
-void DWM_ReceiveData(uint8_t* buffer){
+void DWM_ReceiveData(uint8_t* buffer, uint8_t* length){
 	// Get frame length
 	uint8_t flen;
 	DWM_ReadSPI_ext(RX_FINFO, NO_SUB, &flen, 1);
 	flen -= 2; // FCS 2 Byte long
+	*length = flen;
 
 	//reading data
 	DWM_ReadSPI_ext(RX_BUFFER, NO_SUB, buffer, flen);
